@@ -22,3 +22,5 @@ wheels/
 *.jsonl.zip
 *.jsonl.tar
 *.jsonl.tar.gz
+
+.DS_Store

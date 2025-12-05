@@ -101,6 +101,12 @@ def apply_date_shifts(
             axis=1,
         )
 
+        # Convert back to date-only format (removes time component)
+        # Convert datetime to Python date objects (Excel will display as date-only)
+        mask = df[date_col].notna()
+        df.loc[mask, date_col] = df.loc[mask, date_col].apply(lambda x: x.date())
+        df.loc[~mask, date_col] = None
+
     return df
 
 
