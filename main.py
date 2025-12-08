@@ -66,6 +66,7 @@ def apply_date_shifts(
     patient_id_col: str,
     date_columns: List[str],
     shift_mappings: pd.DataFrame,
+    date_format: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Apply date shifts to specified columns in a DataFrame.
@@ -75,6 +76,9 @@ def apply_date_shifts(
         patient_id_col: Name of the column containing patient IDs.
         date_columns: List of column names containing dates to shift.
         shift_mappings: DataFrame with 'patient_id' and 'shift_days' columns.
+        date_format: Optional date format string (e.g., 'YYYY-MM-DD'). 
+                     Note: This parameter is kept for API compatibility but formatting
+                     is applied at the Excel cell level, not in the DataFrame.
 
     Returns:
         DataFrame with shifted dates.
@@ -123,6 +127,7 @@ def shift_excel_dates(
     seed: Optional[int] = None,
     patient_header_row: int = 0,
     patient_skip_rows: Optional[List[int]] = None,
+    date_format: Optional[str] = None,
 ) -> None:
     """
     Shift dates in an Excel file for patient IDs consistently across sheets.
@@ -146,6 +151,9 @@ def shift_excel_dates(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional rows to skip when reading the patient sheet (e.g. description rows).
+        date_format: Optional Excel date format string (e.g., 'YYYY-MM-DD', 'yyyy-mm-dd').
+                     If None, Excel's default date format is used.
+                     Common formats: 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', etc.
     """
     def _read_sheet_with_structure(
         excel_file: pd.ExcelFile,
@@ -190,10 +198,33 @@ def shift_excel_dates(
         data_df: pd.DataFrame,
         description_rows: List[List[Any]],
         header_row: int,
+        date_columns: Optional[List[str]] = None,
+        date_format: Optional[str] = None,
     ) -> None:
         """
         Write a sheet preserving description rows and structure.
+        
+        Args:
+            writer: ExcelWriter instance.
+            sheet_name: Name of the sheet to write.
+            data_df: DataFrame with data to write.
+            description_rows: List of description rows to write at the top.
+            header_row: Row index where header should be written.
+            date_columns: Optional list of date column names to format.
+            date_format: Optional Excel date format string (e.g., 'yyyy-mm-dd').
         """
+        # Convert Python date format to Excel format
+        excel_date_format = None
+        if date_format:
+            # Convert common Python format strings to Excel format
+            # Excel uses lowercase: yyyy (year), mm (month), dd (day)
+            excel_date_format = (
+                date_format.replace('YYYY', 'yyyy')
+                          .replace('YY', 'yy')
+                          .replace('DD', 'dd')
+                          .replace('MM', 'mm')
+            )
+        
         # Calculate where to start writing data (after description rows + header row)
         data_start_row = len(description_rows) + 1 if description_rows else 1
         
@@ -224,6 +255,20 @@ def shift_excel_dates(
         header_row_idx = len(description_rows) + 1 if description_rows else 1
         for col_idx, col_name in enumerate(data_df.columns, start=1):
             worksheet.cell(row=header_row_idx, column=col_idx, value=col_name)
+        
+        # Apply date formatting to date columns if specified
+        if excel_date_format and date_columns:
+            # Find column indices for date columns
+            col_map = {col: idx + 1 for idx, col in enumerate(data_df.columns)}
+            for date_col in date_columns:
+                if date_col in col_map:
+                    col_idx = col_map[date_col]
+                    # Apply format to all data rows (skip description and header rows)
+                    for row_idx in range(data_start_row + 1, data_start_row + len(data_df) + 1):
+                        cell = worksheet.cell(row=row_idx, column=col_idx)
+                        # Only format if cell has a date value
+                        if cell.value is not None:
+                            cell.number_format = excel_date_format
 
     # Read patient IDs from the central patient sheet
     patient_excel = pd.ExcelFile(input_file, engine="openpyxl")
@@ -269,12 +314,16 @@ def shift_excel_dates(
 
             header_row = default_header_row
 
+            # Track date columns for formatting
+            sheet_date_columns: Optional[List[str]] = None
+
             # Check if this sheet needs date shifting
             if sheet_name in sheet_configs:
                 config = sheet_configs[cast(str, sheet_name)]
                 sheet_patient_id_col: str = cast(str, config["patient_id_col"])
                 date_columns: List[str] = cast(List[str], config["date_columns"])
                 header_row = cast(int, config.get("header_row", header_row))
+                sheet_date_columns = date_columns
 
             # Read sheet preserving structure
             df, description_df, description_rows = _read_sheet_with_structure(
@@ -290,7 +339,7 @@ def shift_excel_dates(
                     )
 
                 df = apply_date_shifts(
-                    df, sheet_patient_id_col, date_columns, shift_mappings
+                    df, sheet_patient_id_col, date_columns, shift_mappings, date_format=None
                 )
 
             # Write the sheet preserving description rows (shifted or unshifted)
@@ -300,6 +349,8 @@ def shift_excel_dates(
                 data_df=df,
                 description_rows=description_rows,
                 header_row=header_row,
+                date_columns=sheet_date_columns,
+                date_format=date_format,
             )
 
     # Save linking table
@@ -348,6 +399,7 @@ def main():
         seed=42,  # Optional: for reproducibility
         patient_header_row=1,
         patient_skip_rows=None,
+        date_format="YYYY-MM-DD",  # Format dates as YYYY-MM-DD
     )
 
     print("\nDate shifting complete!")
