@@ -8,7 +8,7 @@ reproducible shifts using a linking table.
 
 import random
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
@@ -115,12 +115,14 @@ def shift_excel_dates(
     output_file: str,
     patient_sheet: str,
     patient_id_col: str,
-    sheet_configs: Dict[str, Dict[str, str]],
+    sheet_configs: Dict[str, Dict[str, Any]],
     min_shift_days: int = -15,
     max_shift_days: int = 15,
     linking_table_path: Optional[str] = None,
     linking_table_output: Optional[str] = None,
     seed: Optional[int] = None,
+    patient_header_row: int = 0,
+    patient_skip_rows: Optional[List[int]] = None,
 ) -> None:
     """
     Shift dates in an Excel file for patient IDs consistently across sheets.
@@ -134,14 +136,102 @@ def shift_excel_dates(
                       Each config dict should have:
                       - 'patient_id_col': Name of patient ID column in that sheet
                       - 'date_columns': List of date column names to shift
+                      Optional per-sheet header handling:
+                      - 'header_row': zero-based row index of the column names (default 0)
+                      - 'skip_rows': list of zero-based row indices to skip (e.g. description rows)
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
+        patient_header_row: Zero-based header row index for the patient sheet (default: 0).
+        patient_skip_rows: Optional rows to skip when reading the patient sheet (e.g. description rows).
     """
+    def _read_sheet_with_structure(
+        excel_file: pd.ExcelFile,
+        sheet_name: str,
+        header_row: int = 0,
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, List[List[Any]]]:
+        """
+        Read a sheet preserving description rows and structure.
+        
+        Returns:
+            Tuple of (data_df, description_df, description_rows)
+            - data_df: DataFrame with header row as column names and data rows
+            - description_df: DataFrame with description rows (if any)
+            - description_rows: List of description row data (for writing back)
+        """
+        # Read entire sheet without header to preserve all rows
+        full_df = pd.read_excel(excel_file, sheet_name=sheet_name, header=None)
+        
+        if header_row == 0:
+            # No description rows, header is first row
+            description_rows: List[List[Any]] = []
+            description_df = pd.DataFrame()
+            # Use first row as header
+            data_df = pd.read_excel(
+                excel_file, sheet_name=sheet_name, header=0
+            )
+        else:
+            # Extract description rows (rows before header_row)
+            description_rows = full_df.iloc[:header_row].values.tolist()
+            description_df = full_df.iloc[:header_row].copy()
+            
+            # Read data with header_row as column names
+            data_df = pd.read_excel(
+                excel_file, sheet_name=sheet_name, header=header_row
+            )
+        
+        return data_df, description_df, description_rows
+    
+    def _write_sheet_with_structure(
+        writer: pd.ExcelWriter,
+        sheet_name: str,
+        data_df: pd.DataFrame,
+        description_rows: List[List[Any]],
+        header_row: int,
+    ) -> None:
+        """
+        Write a sheet preserving description rows and structure.
+        """
+        # Calculate where to start writing data (after description rows + header row)
+        data_start_row = len(description_rows) + 1 if description_rows else 1
+        
+        # Write data without header first (header=False), then we'll add header manually
+        data_df.to_excel(
+            writer, 
+            sheet_name=sheet_name, 
+            index=False, 
+            header=False,
+            startrow=data_start_row
+        )
+        
+        # Get the workbook and worksheet
+        workbook = writer.book
+        worksheet = workbook[sheet_name]
+        
+        # Write description rows at the top
+        if description_rows:
+            for row_idx, desc_row in enumerate(description_rows, start=1):
+                for col_idx, value in enumerate(desc_row, start=1):
+                    cell_value = value
+                    # Handle NaN values
+                    if pd.isna(cell_value):
+                        cell_value = None
+                    worksheet.cell(row=row_idx, column=col_idx, value=cell_value)
+        
+        # Write header row (after description rows)
+        header_row_idx = len(description_rows) + 1 if description_rows else 1
+        for col_idx, col_name in enumerate(data_df.columns, start=1):
+            worksheet.cell(row=header_row_idx, column=col_idx, value=col_name)
+
     # Read patient IDs from the central patient sheet
-    patient_df = pd.read_excel(input_file, sheet_name=patient_sheet)
+    patient_excel = pd.ExcelFile(input_file, engine="openpyxl")
+    patient_df, _, _ = _read_sheet_with_structure(
+        patient_excel,
+        sheet_name=patient_sheet,
+        header_row=patient_header_row,
+    )
     if patient_id_col not in patient_df.columns:
         raise ValueError(
             f"Patient ID column '{patient_id_col}' not found in sheet '{patient_sheet}'"
@@ -174,14 +264,26 @@ def shift_excel_dates(
         excel_file = pd.ExcelFile(input_file, engine="openpyxl")
 
         for sheet_name in excel_file.sheet_names:
-            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            # Default header handling unless overridden per sheet
+            default_header_row = 0
+
+            header_row = default_header_row
 
             # Check if this sheet needs date shifting
             if sheet_name in sheet_configs:
                 config = sheet_configs[cast(str, sheet_name)]
                 sheet_patient_id_col: str = cast(str, config["patient_id_col"])
                 date_columns: List[str] = cast(List[str], config["date_columns"])
+                header_row = cast(int, config.get("header_row", header_row))
 
+            # Read sheet preserving structure
+            df, description_df, description_rows = _read_sheet_with_structure(
+                excel_file,
+                sheet_name=cast(str, sheet_name),
+                header_row=header_row,
+            )
+
+            if sheet_name in sheet_configs:
                 if sheet_patient_id_col not in df.columns:
                     raise ValueError(
                         f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"
@@ -191,8 +293,14 @@ def shift_excel_dates(
                     df, sheet_patient_id_col, date_columns, shift_mappings
                 )
 
-            # Write the sheet (shifted or unshifted)
-            df.to_excel(writer, sheet_name=cast(str, sheet_name), index=False)
+            # Write the sheet preserving description rows (shifted or unshifted)
+            _write_sheet_with_structure(
+                writer,
+                sheet_name=cast(str, sheet_name),
+                data_df=df,
+                description_rows=description_rows,
+                header_row=header_row,
+            )
 
     # Save linking table
     if linking_table_output:
@@ -205,7 +313,8 @@ def main():
     """
     Main entry point with hardcoded inputs for dev/testing.
     """
-    input_file = "test.xlsx"
+    # Toggle between sample files as needed
+    input_file = "test_header_2.xlsx"
     output_file = "test_shifted.xlsx"
 
     # Configuration: sheet name -> {patient_id_col, date_columns}
@@ -216,10 +325,12 @@ def main():
         "patients": {
             "patient_id_col": "patient_id",
             "date_columns": ["dob"],
+            "header_row": 1,  # column names on second row (zero-based index 1)
         },
         "labs": {
             "patient_id_col": "patient_id",
             "date_columns": ["test_date"],
+            "header_row": 1,
         },
     }
 
@@ -235,6 +346,8 @@ def main():
         linking_table_path=None,  # Optional: path to existing linking table
         linking_table_output="shift_mappings.csv",
         seed=42,  # Optional: for reproducibility
+        patient_header_row=1,
+        patient_skip_rows=None,
     )
 
     print("\nDate shifting complete!")
