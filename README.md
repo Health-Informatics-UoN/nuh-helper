@@ -11,6 +11,7 @@ Helper functions for enabling studies: utilities for study enablement such as da
 ## Modules
 
 - **`nuh_helper.date_shift`** — Date shifting for patient data in Excel/DataFrames (consistent shifts per patient ID, reproducible via linking tables).
+- **`nuh_helper.profile`** - Profile a dataset into a Scan Report
 
 ## Usage
 
@@ -97,3 +98,18 @@ shift_excel_dates(
 - Preserves Excel structure (description rows)
 - Supports flexible date parsing (handles various formats and placeholders like "Unknown")
 - Reproducible shifts via linking tables
+
+### Dataset Profile
+
+Profile a dataset and generate a Scan Report.
+
+```python
+from nuh_helper import generate_scan_report
+
+
+csv_files = [
+    "patients.csv",
+]
+
+generate_scan_report(csv_files, min_cell_count=5)
+```
