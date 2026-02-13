@@ -19,4 +19,5 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pandas-stubs>=2.3.3.251201",
+    "types-openpyxl>=3.1.5.20250919",
 ]
