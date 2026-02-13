@@ -2,10 +2,10 @@
 
 Helper functions for enabling studies: utilities for study enablement such as date shifting, profiling, and related workflows.
 
-## Installation
+## Notebook Installation
 
 ```bash
-pip install ....
+!pip install git+https://github.com/Health-Informatics-UoN/nuh-studies.git
 ```
 
 ## Modules
