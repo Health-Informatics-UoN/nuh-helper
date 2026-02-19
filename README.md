@@ -5,7 +5,7 @@ Helper functions for enabling studies: utilities for study enablement such as da
 ## Notebook Installation
 
 ```bash
-!pip install git+https://github.com/Health-Informatics-UoN/nuh-studies.git
+!pip install git+https://github.com/Health-Informatics-UoN/nuh-helper.git
 ```
 
 ## Modules
