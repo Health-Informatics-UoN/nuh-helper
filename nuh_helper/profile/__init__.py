@@ -77,7 +77,8 @@ def generate_scan_report(
     indexed_names = index_table_names([t["name"] for t in tables])
 
     wb = Workbook()
-    wb.remove(wb.active)
+    if wb.active:
+        wb.remove(wb.active)
 
     # FIELD_OVERVIEW
     field_sheet = wb.create_sheet("Field Overview")

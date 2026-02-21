@@ -62,7 +62,8 @@ def _parse_date_value(value: Any) -> Optional[pd.Timestamp]:
 
     # Already datetime-like
     if isinstance(value, (pd.Timestamp, datetime, date)):
-        return pd.to_datetime(value, errors="coerce")
+        result = pd.to_datetime(value, errors="coerce")
+        return result if pd.notna(result) else None
 
     if isinstance(value, str):
         v = value.strip()
@@ -79,9 +80,7 @@ def _parse_date_value(value: Any) -> Optional[pd.Timestamp]:
                 pass
 
         # Fallback: let pandas try with dayfirst to handle ambiguous strings
-        parsed = pd.to_datetime(
-            v, errors="coerce", dayfirst=True, infer_datetime_format=True
-        )
+        parsed = pd.to_datetime(v, errors="coerce", dayfirst=True)
         return parsed if pd.notna(parsed) else None
 
     # Anything else: no parse
