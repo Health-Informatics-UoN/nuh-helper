@@ -12,6 +12,7 @@ wheels/
 
 # Output files
 *.csv
+tests/output/
 *.jsonl
 *.jsonl.gz
 *.jsonl.bz2
