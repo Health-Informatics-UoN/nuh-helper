@@ -104,7 +104,9 @@ class TestGenerateShiftMappings:
 
     def test_shifts_within_specified_range(self):
         ids = [f"P{i:03d}" for i in range(100)]
-        result = generate_shift_mappings(ids, min_shift_days=-7, max_shift_days=7, seed=42)
+        result = generate_shift_mappings(
+            ids, min_shift_days=-7, max_shift_days=7, seed=42
+        )
         assert result["shift_days"].between(-7, 7).all()
 
     def test_empty_patient_list(self):
@@ -133,51 +135,69 @@ class TestApplyDateShifts:
 
     def test_shifts_date_forward(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert result["visit_date"].iloc[0] == date(2023, 1, 25)
 
     def test_shifts_date_backward(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-06-01"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", -5))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", -5)
+        )
         assert result["visit_date"].iloc[0] == date(2023, 5, 27)
 
     def test_zero_shift_leaves_date_unchanged(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 0))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 0)
+        )
         assert result["visit_date"].iloc[0] == date(2023, 1, 15)
 
     def test_unknown_patient_leaves_date_unchanged(self):
         df = pd.DataFrame({"patient_id": ["P999"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert result["visit_date"].iloc[0] == date(2023, 1, 15)
 
     def test_placeholder_date_becomes_none(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["Unknown"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert result["visit_date"].iloc[0] is None
 
     def test_none_date_stays_none(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": [None]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert result["visit_date"].iloc[0] is None
 
     def test_missing_date_column_is_skipped(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
         mappings = self._make_mappings("P001", 10)
         # "nonexistent" should be silently skipped; "visit_date" still shifted
-        result = apply_date_shifts(df, "patient_id", ["nonexistent", "visit_date"], mappings)
+        result = apply_date_shifts(
+            df, "patient_id", ["nonexistent", "visit_date"], mappings
+        )
         assert result["visit_date"].iloc[0] == date(2023, 1, 25)
 
     def test_strips_whitespace_from_patient_ids(self):
         df = pd.DataFrame({"patient_id": ["  P001  "], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert result["visit_date"].iloc[0] == date(2023, 1, 25)
 
     def test_multiple_patients_shifted_independently(self):
-        df = pd.DataFrame({
-            "patient_id": ["P001", "P002"],
-            "visit_date": ["2023-01-01", "2023-01-01"],
-        })
+        df = pd.DataFrame(
+            {
+                "patient_id": ["P001", "P002"],
+                "visit_date": ["2023-01-01", "2023-01-01"],
+            }
+        )
         mappings = pd.DataFrame({"patient_id": ["P001", "P002"], "shift_days": [5, -5]})
         result = apply_date_shifts(df, "patient_id", ["visit_date"], mappings)
         assert result["visit_date"].iloc[0] == date(2023, 1, 6)
@@ -185,7 +205,9 @@ class TestApplyDateShifts:
 
     def test_result_dates_are_date_not_datetime(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 0))
+        result = apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 0)
+        )
         val = result["visit_date"].iloc[0]
         assert isinstance(val, date)
         assert not isinstance(val, datetime)
@@ -193,5 +215,7 @@ class TestApplyDateShifts:
     def test_does_not_mutate_input(self):
         df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
         original_visit = df["visit_date"].iloc[0]
-        apply_date_shifts(df, "patient_id", ["visit_date"], self._make_mappings("P001", 10))
+        apply_date_shifts(
+            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        )
         assert df["visit_date"].iloc[0] == original_visit

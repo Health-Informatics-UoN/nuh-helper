@@ -12,7 +12,7 @@ FIELD_OVERVIEW_HEADERS = [
     "Description",
     "Type",
     "Max length",
-    "N rows"
+    "N rows",
 ]
 
 TABLE_OVERVIEW_HEADERS = [
@@ -21,8 +21,9 @@ TABLE_OVERVIEW_HEADERS = [
     "N rows",
     "N rows checked",
     "N fields",
-    "N fields empty"
+    "N fields empty",
 ]
+
 
 def index_table_names(table_names):
     indexed = {}
@@ -34,10 +35,12 @@ def index_table_names(table_names):
 
     return indexed
 
+
 def read_csv_header(csv_path):
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.reader(f)
         return next(reader)
+
 
 def scan_csv_values(csv_path, min_cell_count):
     counters = defaultdict(Counter)
@@ -54,24 +57,21 @@ def scan_csv_values(csv_path, min_cell_count):
     filtered = {}
     for field, counter in counters.items():
         filtered[field] = [
-            (val, cnt)
-            for val, cnt in counter.most_common()
-            if cnt >= min_cell_count
+            (val, cnt) for val, cnt in counter.most_common() if cnt >= min_cell_count
         ]
 
     return filtered, row_count
 
-def generate_scan_report(csv_files, output_path=SCAN_REPORT_FILE_NAME, min_cell_count=1):
+
+def generate_scan_report(
+    csv_files, output_path=SCAN_REPORT_FILE_NAME, min_cell_count=1
+):
     tables = []
 
     for csv_file in csv_files:
         csv_file = Path(csv_file)
         header = read_csv_header(csv_file)
-        tables.append({
-            "name": csv_file.name,
-            "path": csv_file,
-            "fields": header
-        })
+        tables.append({"name": csv_file.name, "path": csv_file, "fields": header})
 
     tables.sort(key=lambda t: t["name"])
     indexed_names = index_table_names([t["name"] for t in tables])
@@ -86,14 +86,7 @@ def generate_scan_report(csv_files, output_path=SCAN_REPORT_FILE_NAME, min_cell_
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
         for field in table["fields"]:
-            field_sheet.append([
-                table_name_indexed,
-                field,
-                "",
-                "STRING",
-                "",
-                ""
-            ])
+            field_sheet.append([table_name_indexed, field, "", "STRING", "", ""])
         field_sheet.append([""])
 
     # TABLE_OVERVIEW
@@ -107,14 +100,9 @@ def generate_scan_report(csv_files, output_path=SCAN_REPORT_FILE_NAME, min_cell_
         value_data, row_count = scan_csv_values(table["path"], min_cell_count)
         table_value_data[table_name_indexed] = value_data
 
-        table_sheet.append([
-            table_name_indexed,
-            "",
-            row_count,
-            row_count,
-            len(table["fields"]),
-            -1
-        ])
+        table_sheet.append(
+            [table_name_indexed, "", row_count, row_count, len(table["fields"]), -1]
+        )
 
     # VALUE SHEETS
     for table in tables:
@@ -130,10 +118,7 @@ def generate_scan_report(csv_files, output_path=SCAN_REPORT_FILE_NAME, min_cell_
             header.append("Frequency")
         value_sheet.append(header)
 
-        max_len = max(
-            (len(value_data.get(field, [])) for field in fields),
-            default=0
-        )
+        max_len = max((len(value_data.get(field, [])) for field in fields), default=0)
 
         for i in range(max_len):
             row = []

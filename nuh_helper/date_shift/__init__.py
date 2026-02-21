@@ -34,12 +34,8 @@ def generate_shift_mappings(
     if seed is not None:
         random.seed(seed)
 
-    shifts = [
-        random.randint(min_shift_days, max_shift_days) for _ in patient_ids
-    ]
-    return pd.DataFrame(
-        {"patient_id": patient_ids, "shift_days": shifts}
-    )
+    shifts = [random.randint(min_shift_days, max_shift_days) for _ in patient_ids]
+    return pd.DataFrame({"patient_id": patient_ids, "shift_days": shifts})
 
 
 def load_shift_mappings(csv_path: str) -> pd.DataFrame:
@@ -55,9 +51,7 @@ def load_shift_mappings(csv_path: str) -> pd.DataFrame:
     """
     df = pd.read_csv(csv_path)
     if "patient_id" not in df.columns or "shift_days" not in df.columns:
-        raise ValueError(
-            "CSV must contain 'patient_id' and 'shift_days' columns"
-        )
+        raise ValueError("CSV must contain 'patient_id' and 'shift_days' columns")
     return df
 
 
@@ -85,7 +79,9 @@ def _parse_date_value(value: Any) -> Optional[pd.Timestamp]:
                 pass
 
         # Fallback: let pandas try with dayfirst to handle ambiguous strings
-        parsed = pd.to_datetime(v, errors="coerce", dayfirst=True, infer_datetime_format=True)
+        parsed = pd.to_datetime(
+            v, errors="coerce", dayfirst=True, infer_datetime_format=True
+        )
         return parsed if pd.notna(parsed) else None
 
     # Anything else: no parse
@@ -132,9 +128,7 @@ def apply_date_shifts(
     # Normalize patient IDs in the working DataFrame to align with mapping keys
     df[patient_id_col] = df[patient_id_col].apply(_normalize_patient_id)
 
-    shift_dict = dict(
-        zip(shift_mappings["patient_id"], shift_mappings["shift_days"])
-    )
+    shift_dict = dict(zip(shift_mappings["patient_id"], shift_mappings["shift_days"]))
 
     for date_col in date_columns:
         if date_col not in df.columns:
@@ -146,7 +140,8 @@ def apply_date_shifts(
         # Apply shifts
         df[date_col] = df.apply(
             lambda row: (
-                row[date_col] + pd.Timedelta(days=shift_dict.get(row[patient_id_col], 0))
+                row[date_col]
+                + pd.Timedelta(days=shift_dict.get(row[patient_id_col], 0))
                 if row[date_col] is not None and row[patient_id_col] in shift_dict
                 else row[date_col]
             ),
@@ -155,7 +150,9 @@ def apply_date_shifts(
 
         # Convert back to date-only format (removes time component)
         df[date_col] = df[date_col].apply(
-            lambda x: x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
+            lambda x: (
+                x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
+            )
         )
 
     return df
@@ -202,6 +199,7 @@ def shift_excel_dates(
                      If None, Excel's default date format is used.
                      Common formats: 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', etc.
     """
+
     def _read_sheet_with_structure(
         excel_file: pd.ExcelFile,
         sheet_name: str,
@@ -224,9 +222,7 @@ def shift_excel_dates(
             description_rows: List[List[Any]] = []
             description_df = pd.DataFrame()
             # Use first row as header
-            data_df = pd.read_excel(
-                excel_file, sheet_name=sheet_name, header=0
-            )
+            data_df = pd.read_excel(excel_file, sheet_name=sheet_name, header=0)
         else:
             # Extract description rows (rows before header_row)
             description_rows = full_df.iloc[:header_row].values.tolist()
@@ -266,10 +262,10 @@ def shift_excel_dates(
             # Convert common Python format strings to Excel format
             # Excel uses lowercase: yyyy (year), mm (month), dd (day)
             excel_date_format = (
-                date_format.replace('YYYY', 'yyyy')
-                          .replace('YY', 'yy')
-                          .replace('DD', 'dd')
-                          .replace('MM', 'mm')
+                date_format.replace("YYYY", "yyyy")
+                .replace("YY", "yy")
+                .replace("DD", "dd")
+                .replace("MM", "mm")
             )
 
         # Calculate where to start writing data (after description rows + header row)
@@ -281,7 +277,7 @@ def shift_excel_dates(
             sheet_name=sheet_name,
             index=False,
             header=False,
-            startrow=data_start_row
+            startrow=data_start_row,
         )
 
         # Get the workbook and worksheet
@@ -311,7 +307,9 @@ def shift_excel_dates(
                 if date_col in col_map:
                     col_idx = col_map[date_col]
                     # Apply format to all data rows (skip description and header rows)
-                    for row_idx in range(data_start_row + 1, data_start_row + len(data_df) + 1):
+                    for row_idx in range(
+                        data_start_row + 1, data_start_row + len(data_df) + 1
+                    ):
                         cell = worksheet.cell(row=row_idx, column=col_idx)
                         # Only format if cell has a date value
                         if cell.value is not None:
@@ -341,9 +339,7 @@ def shift_excel_dates(
     if linking_table_path and Path(linking_table_path).exists():
         shift_mappings = load_shift_mappings(linking_table_path)
         # Filter to only include patient IDs that exist in the data
-        shift_mappings = shift_mappings[
-            shift_mappings["patient_id"].isin(patient_ids)
-        ]
+        shift_mappings = shift_mappings[shift_mappings["patient_id"].isin(patient_ids)]
         # Add any missing patient IDs with random shifts
         existing_ids = set(shift_mappings["patient_id"])
         missing_ids = [pid for pid in patient_ids if pid not in existing_ids]
@@ -358,8 +354,12 @@ def shift_excel_dates(
         )
 
     # Normalize and deduplicate patient IDs in the mapping
-    shift_mappings["patient_id"] = shift_mappings["patient_id"].apply(_normalize_patient_id)
-    shift_mappings = shift_mappings.dropna(subset=["patient_id"]).drop_duplicates(subset=["patient_id"], keep="first")
+    shift_mappings["patient_id"] = shift_mappings["patient_id"].apply(
+        _normalize_patient_id
+    )
+    shift_mappings = shift_mappings.dropna(subset=["patient_id"]).drop_duplicates(
+        subset=["patient_id"], keep="first"
+    )
 
     # Process each sheet
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
@@ -396,7 +396,11 @@ def shift_excel_dates(
                     )
 
                 df = apply_date_shifts(
-                    df, sheet_patient_id_col, date_columns, shift_mappings, date_format=None
+                    df,
+                    sheet_patient_id_col,
+                    date_columns,
+                    shift_mappings,
+                    date_format=None,
                 )
 
             # Write the sheet preserving description rows (shifted or unshifted)
