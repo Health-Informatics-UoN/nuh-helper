@@ -486,15 +486,7 @@ def shift_excel_dates_inplace(
     logger.info("Linking table saved to '%s'", linking_path)
 
 
-# Re-export public API and private helpers used by tests
-from nuh_helper.date_shift._excel import (  # noqa: E402
-    _description_merged_ranges,
-    _get_row_values_resolving_merged,
-)
-from nuh_helper.date_shift._parse import (  # noqa: E402
-    _normalize_patient_id,
-    _parse_date_value,
-)
+# Re-export public API
 from nuh_helper.date_shift.mappings import (  # noqa: E402
     generate_shift_mappings,
     load_shift_mappings,
@@ -506,9 +498,4 @@ __all__ = [
     "apply_date_shifts",
     "generate_shift_mappings",
     "load_shift_mappings",
-    # Private helpers exposed for tests
-    "_description_merged_ranges",
-    "_get_row_values_resolving_merged",
-    "_normalize_patient_id",
-    "_parse_date_value",
 ]
