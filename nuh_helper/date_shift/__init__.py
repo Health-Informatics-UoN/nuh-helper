@@ -59,6 +59,8 @@ def _description_merged_ranges(
             result.append(str(merged_range))
     return result
 
+logger = logging.getLogger(__name__)
+
 
 def generate_shift_mappings(
     patient_ids: list[str],
