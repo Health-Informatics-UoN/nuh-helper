@@ -5,12 +5,15 @@ Consistently shifts dates for patient IDs across multiple sheets and columns
 in an Excel file, with support for reproducible shifts using a linking table.
 """
 
+import logging
 import random
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 def generate_shift_mappings(
@@ -52,6 +55,7 @@ def load_shift_mappings(csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(csv_path)
     if "patient_id" not in df.columns or "shift_days" not in df.columns:
         raise ValueError("CSV must contain 'patient_id' and 'shift_days' columns")
+    logger.info("Loaded %d shift mapping(s) from '%s'", len(df), csv_path)
     return df
 
 
@@ -139,10 +143,21 @@ def apply_date_shifts(
 
     for date_col in date_columns:
         if date_col not in df.columns:
+            logger.warning(
+                "Date column '%s' not found in DataFrame, skipping", date_col
+            )
             continue
 
         # Parse flexible date strings (handles YYYY-DD-MM and placeholders "Unknown")
+        non_null_before = df[date_col].notna().sum()
         df[date_col] = df[date_col].apply(_parse_date_value)
+        parse_failures = non_null_before - sum(x is not None for x in df[date_col])
+        if parse_failures > 0:
+            logger.debug(
+                "Column '%s': %d value(s) could not be parsed as dates",
+                date_col,
+                parse_failures,
+            )
 
         # Apply shifts
         df[date_col] = df.apply(
@@ -206,6 +221,10 @@ def shift_excel_dates(
                      If None, Excel's default date format is used.
                      Common formats: 'YYYY-MM-DD', 'MM/DD/YYYY', 'DD-MM-YYYY', etc.
     """  # noqa: E501
+    logger.info("Shifting dates: '%s' → '%s'", input_file, output_file)
+    logger.debug(
+        "Shift range: %d to %d days, seed=%s", min_shift_days, max_shift_days, seed
+    )
 
     def _read_sheet_with_structure(
         excel_file: pd.ExcelFile,
@@ -341,9 +360,13 @@ def shift_excel_dates(
         .unique()
         .tolist()
     )
+    logger.info(
+        "Found %d patient(s) in sheet '%s'", len(patient_ids), patient_sheet
+    )
 
     # Generate or load shift mappings
     if linking_table_path and Path(linking_table_path).exists():
+        logger.info("Loading shift mappings from '%s'", linking_table_path)
         shift_mappings = load_shift_mappings(linking_table_path)
         # Filter to only include patient IDs that exist in the data
         shift_mappings = shift_mappings[shift_mappings["patient_id"].isin(patient_ids)]
@@ -351,11 +374,16 @@ def shift_excel_dates(
         existing_ids = set(shift_mappings["patient_id"])
         missing_ids = [pid for pid in patient_ids if pid not in existing_ids]
         if missing_ids:
+            logger.warning(
+                "%d patient(s) had no entry in the linking table; new shifts generated",
+                len(missing_ids),
+            )
             new_shifts = generate_shift_mappings(
                 missing_ids, min_shift_days, max_shift_days, seed
             )
             shift_mappings = pd.concat([shift_mappings, new_shifts], ignore_index=True)
     else:
+        logger.info("Generating shift mappings for %d patient(s)", len(patient_ids))
         shift_mappings = generate_shift_mappings(
             patient_ids, min_shift_days, max_shift_days, seed
         )
@@ -388,6 +416,11 @@ def shift_excel_dates(
                 date_columns: list[str] = cast(list[str], config["date_columns"])
                 header_row = cast(int, config.get("header_row", header_row))
                 sheet_date_columns = date_columns
+                logger.info(
+                    "Shifting %d date column(s) in sheet '%s'",
+                    len(date_columns),
+                    sheet_name,
+                )
 
             # Read sheet preserving structure
             df, description_df, description_rows = _read_sheet_with_structure(
@@ -421,11 +454,12 @@ def shift_excel_dates(
                 date_format=date_format,
             )
 
+    logger.info("Output written to '%s'", output_file)
+
     # Save linking table
-    if linking_table_output:
-        shift_mappings.to_csv(linking_table_output, index=False)
-    else:
-        shift_mappings.to_csv("shift_mappings.csv", index=False)
+    linking_path = linking_table_output or "shift_mappings.csv"
+    shift_mappings.to_csv(linking_path, index=False)
+    logger.info("Linking table saved to '%s'", linking_path)
 
 
 __all__ = [

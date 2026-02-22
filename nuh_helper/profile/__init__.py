@@ -1,9 +1,12 @@
 import csv
+import logging
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
 from openpyxl import Workbook
+
+logger = logging.getLogger(__name__)
 
 SCAN_REPORT_FILE_NAME = "ScanReport.xlsx"
 
@@ -71,11 +74,14 @@ def generate_scan_report(
     output_path: str = SCAN_REPORT_FILE_NAME,
     min_cell_count: int = 1,
 ) -> str:
+    logger.info("Generating scan report for %d table(s)", len(csv_files))
+
     tables = []
 
     for csv_file in csv_files:
         csv_file = Path(csv_file)
         header = read_csv_header(csv_file.as_posix())
+        logger.info("Scanning '%s' (%d field(s))", csv_file.name, len(header))
         tables.append(
             {"name": csv_file.name, "path": csv_file.as_posix(), "fields": header}
         )
@@ -151,4 +157,5 @@ def generate_scan_report(
     meta_sheet.append(["minCellCount", min_cell_count])
 
     wb.save(output_path)
+    logger.info("Scan report written to '%s'", output_path)
     return output_path
