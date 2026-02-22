@@ -76,6 +76,26 @@ shift_excel_dates(
 )
 ```
 
+### Preserving formatting with `shift_excel_dates_inplace`
+
+If your workbook has rich formatting (cell styles, column widths, conditional formatting, etc.) use `shift_excel_dates_inplace` instead. It copies the input file and modifies date cells directly via openpyxl, so all formatting is preserved exactly.
+
+```python
+from nuh_helper import shift_excel_dates_inplace
+
+shift_excel_dates_inplace(
+    input_file="input.xlsx",
+    output_file="output.xlsx",
+    patient_sheet="patients",
+    patient_id_col="patient_id",
+    sheet_configs=sheet_configs,
+    seed=42,
+    linking_table_output="shift_mappings.csv",
+)
+```
+
+The function accepts the same parameters as `shift_excel_dates` except `date_format` (not needed — the original cell format is preserved). External links and named ranges are removed from the output to avoid Excel repair dialogs.
+
 ### Key parameters (date shifting)
 
 - `input_file`: Path to input Excel file
@@ -93,7 +113,7 @@ shift_excel_dates(
 - `linking_table_path`: (Optional) Path to existing linking table CSV for reproducibility
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
-- `date_format`: (Optional) Excel date format string (e.g., 'YYYY-MM-DD')
+- `date_format`: (Optional, `shift_excel_dates` only) Excel date format string (e.g., ‘YYYY-MM-DD’)
 
 ### Excel layout (header row and merged cells)
 
@@ -106,6 +126,7 @@ Sheets can have a non-standard layout: e.g. a merged title row, then a descripti
 ### Date shifting features
 
 - Shifts dates consistently across multiple Excel sheets
+- `shift_excel_dates_inplace`: full formatting preservation (cell styles, column widths, conditional formatting, etc.)
 - Preserves Excel structure (description rows and merged cells in that area)
 - Correct header detection with merged cells (openpyxl-based resolution)
 - Optional skip of rows after the header (e.g. data-type row) via `skip_rows_after_header`
