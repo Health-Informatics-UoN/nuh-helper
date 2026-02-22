@@ -29,7 +29,7 @@ def _parse_date_value(
                 if pd.notna(parsed):
                     return parsed
             except (TypeError, ValueError):
-                # If parsing with this specific format fails, silently try the next format.
+                # If parsing with this specific format fails, silently try next format.
                 pass
 
         # Fallback: let pandas try with dayfirst to handle ambiguous strings
