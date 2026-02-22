@@ -28,7 +28,8 @@ def _parse_date_value(
                 parsed = pd.to_datetime(v, format=fmt, errors="coerce")
                 if pd.notna(parsed):
                     return parsed
-            except Exception:
+            except (TypeError, ValueError):
+                # If parsing with this specific format fails, silently try the next format.
                 pass
 
         # Fallback: let pandas try with dayfirst to handle ambiguous strings
