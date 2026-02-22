@@ -7,15 +7,16 @@ import pytest
 from openpyxl import Workbook
 
 from nuh_helper.date_shift import (
-    _description_merged_ranges,
-    _get_row_values_resolving_merged,
-    _normalize_patient_id,
-    _parse_date_value,
     apply_date_shifts,
     generate_shift_mappings,
     load_shift_mappings,
     shift_excel_dates,
 )
+from nuh_helper.date_shift._excel import (
+    _description_merged_ranges,
+    _get_row_values_resolving_merged,
+)
+from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_value
 
 
 class TestNormalizePatientId:
