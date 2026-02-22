@@ -487,6 +487,7 @@ def shift_excel_dates_inplace(
 
 
 # Re-export public API
+from nuh_helper.date_shift.audit import audit_date_columns  # noqa: E402
 from nuh_helper.date_shift.mappings import (  # noqa: E402
     generate_shift_mappings,
     load_shift_mappings,
@@ -495,6 +496,7 @@ from nuh_helper.date_shift.mappings import (  # noqa: E402
 __all__ = [
     "shift_excel_dates",
     "shift_excel_dates_inplace",
+    "audit_date_columns",
     "apply_date_shifts",
     "generate_shift_mappings",
     "load_shift_mappings",
