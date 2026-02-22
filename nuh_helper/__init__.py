@@ -6,13 +6,17 @@ This library provides utilities for study enablement, including:
 - **Dataset profiling**: profile a dataset into a Scan Report
 """
 
-from nuh_helper.date_shift import (
+import logging
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())
+
+from nuh_helper.date_shift import (  # noqa: E402
     apply_date_shifts,
     generate_shift_mappings,
     load_shift_mappings,
     shift_excel_dates,
 )
-from nuh_helper.profile import generate_scan_report
+from nuh_helper.profile import generate_scan_report  # noqa: E402
 
 __all__ = [
     "shift_excel_dates",
