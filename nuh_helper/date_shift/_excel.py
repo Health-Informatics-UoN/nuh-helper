@@ -1,4 +1,4 @@
-"""Excel sheet structure helpers for date-shift (merged cells, read/write with description rows)."""
+"""Excel sheet structure helpers for date-shift."""
 
 import contextlib
 from typing import Any, cast
