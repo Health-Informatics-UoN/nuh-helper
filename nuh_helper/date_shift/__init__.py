@@ -191,6 +191,10 @@ def apply_date_shifts(
                 x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
             ),
         )
+
+        # conver it to a string; prevents the '######' issue
+        df[date_col] = df[date_col].map(lambda x: str(x))
+
     for key, call in step2.items():
         df[key] = call(df)
 
