@@ -68,16 +68,12 @@ def _get_patient_ids_and_shift_mappings(
         .unique()
         .tolist()
     )
-    logger.info(
-        "Found %d patient(s) in sheet '%s'", len(patient_ids), patient_sheet
-    )
+    logger.info("Found %d patient(s) in sheet '%s'", len(patient_ids), patient_sheet)
 
     if linking_table_path and Path(linking_table_path).exists():
         logger.info("Loading shift mappings from '%s'", linking_table_path)
         shift_mappings = mappings.load_shift_mappings(linking_table_path)
-        shift_mappings = shift_mappings[
-            shift_mappings["patient_id"].isin(patient_ids)
-        ]
+        shift_mappings = shift_mappings[shift_mappings["patient_id"].isin(patient_ids)]
         existing_ids = set(shift_mappings["patient_id"])
         missing_ids = [pid for pid in patient_ids if pid not in existing_ids]
         if missing_ids:
@@ -88,9 +84,7 @@ def _get_patient_ids_and_shift_mappings(
             new_shifts = mappings.generate_shift_mappings(
                 missing_ids, min_shift_days, max_shift_days, seed
             )
-            shift_mappings = pd.concat(
-                [shift_mappings, new_shifts], ignore_index=True
-            )
+            shift_mappings = pd.concat([shift_mappings, new_shifts], ignore_index=True)
     else:
         logger.info("Generating shift mappings for %d patient(s)", len(patient_ids))
         shift_mappings = mappings.generate_shift_mappings(
@@ -141,8 +135,23 @@ def apply_date_shifts(
         )
     )
 
+    step2 = {}
+
     for date_col in date_columns:
+        if not isinstance(date_col, str):
+            key, call = date_col
+
+            if key not in df.columns:
+                raise Exception(
+                    "Date column key '{}' not found in DataFrame".format(date_col)
+                )
+            assert key not in step2
+
+            step2[key] = call
+            continue
+
         if date_col not in df.columns:
+            raise Exception("Date column '{}' not found in DataFrame".format(date_col))
             logger.warning(
                 "Date column '%s' not found in DataFrame, skipping", date_col
             )
@@ -151,10 +160,14 @@ def apply_date_shifts(
         # Parse flexible date strings (handles YYYY-DD-MM and placeholders "Unknown")
         non_null_before = df[date_col].notna().sum()
         df[date_col] = df[date_col].apply(_parse._parse_date_value)
-        parse_failures = non_null_before - sum(
-            x is not None for x in df[date_col]
-        )
+        parse_failures = non_null_before - sum(x is not None for x in df[date_col])
         if parse_failures > 0:
+            raise Exception(
+                "Column '{}': {} value(s) could not be parsed as dates".format(
+                    date_col,
+                    parse_failures,
+                )
+            )
             logger.debug(
                 "Column '%s': %d value(s) could not be parsed as dates",
                 date_col,
@@ -175,11 +188,11 @@ def apply_date_shifts(
         # Convert back to date-only format (removes time component)
         df[date_col] = df[date_col].apply(
             lambda x: (
-                x.date()
-                if isinstance(x, (pd.Timestamp, datetime, date))
-                else None
+                x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
             ),
         )
+    for key, call in step2.items():
+        df[key] = call(df)
 
     return df
 
@@ -397,9 +410,7 @@ def shift_excel_dates_inplace(
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
         date_columns: list[str] = cast(list[str], config["date_columns"])
         header_row: int = cast(int, config.get("header_row", 0))
-        skip_rows_after_header: list[int] | None = config.get(
-            "skip_rows_after_header"
-        )
+        skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
 
         max_col = ws.max_column or 0
         if not max_col:
