@@ -68,16 +68,12 @@ def _get_patient_ids_and_shift_mappings(
         .unique()
         .tolist()
     )
-    logger.info(
-        "Found %d patient(s) in sheet '%s'", len(patient_ids), patient_sheet
-    )
+    logger.info("Found %d patient(s) in sheet '%s'", len(patient_ids), patient_sheet)
 
     if linking_table_path and Path(linking_table_path).exists():
         logger.info("Loading shift mappings from '%s'", linking_table_path)
         shift_mappings = mappings.load_shift_mappings(linking_table_path)
-        shift_mappings = shift_mappings[
-            shift_mappings["patient_id"].isin(patient_ids)
-        ]
+        shift_mappings = shift_mappings[shift_mappings["patient_id"].isin(patient_ids)]
         existing_ids = set(shift_mappings["patient_id"])
         missing_ids = [pid for pid in patient_ids if pid not in existing_ids]
         if missing_ids:
@@ -88,9 +84,7 @@ def _get_patient_ids_and_shift_mappings(
             new_shifts = mappings.generate_shift_mappings(
                 missing_ids, min_shift_days, max_shift_days, seed
             )
-            shift_mappings = pd.concat(
-                [shift_mappings, new_shifts], ignore_index=True
-            )
+            shift_mappings = pd.concat([shift_mappings, new_shifts], ignore_index=True)
     else:
         logger.info("Generating shift mappings for %d patient(s)", len(patient_ids))
         shift_mappings = mappings.generate_shift_mappings(
@@ -112,6 +106,7 @@ def apply_date_shifts(
     date_columns: list[str],
     shift_mappings: pd.DataFrame,
     date_format: str | None = None,
+    shift_exceptions: dict[str, list[str]] | None = None,
 ) -> pd.DataFrame:
     """
     Apply date shifts to specified columns in a DataFrame.
@@ -124,6 +119,8 @@ def apply_date_shifts(
         date_format: Optional date format string (e.g., 'YYYY-MM-DD').
                      Note: This parameter is kept for API compatibility but formatting
                      is applied at the Excel cell level, not in the DataFrame.
+        shift_exceptions: Optional dict mapping column names to lists of date strings
+                          that should never be shifted (e.g. a fixed end-of-study date).
 
     Returns:
         DataFrame with shifted dates.
@@ -141,6 +138,18 @@ def apply_date_shifts(
         )
     )
 
+    # Pre-parse exception dates once per column
+    parsed_exceptions: dict[str, set[date]] = {}
+    if shift_exceptions:
+        for col, exc_values in shift_exceptions.items():
+            parsed_set: set[date] = set()
+            for v in exc_values:
+                ts = _parse._parse_date_value(v)
+                if ts is not None:
+                    parsed_set.add(ts.date())
+            if parsed_set:
+                parsed_exceptions[col] = parsed_set
+
     for date_col in date_columns:
         if date_col not in df.columns:
             logger.warning(
@@ -151,9 +160,7 @@ def apply_date_shifts(
         # Parse flexible date strings (handles YYYY-DD-MM and placeholders "Unknown")
         non_null_before = df[date_col].notna().sum()
         df[date_col] = df[date_col].apply(_parse._parse_date_value)
-        parse_failures = non_null_before - sum(
-            x is not None for x in df[date_col]
-        )
+        parse_failures = non_null_before - sum(x is not None for x in df[date_col])
         if parse_failures > 0:
             logger.debug(
                 "Column '%s': %d value(s) could not be parsed as dates",
@@ -162,11 +169,14 @@ def apply_date_shifts(
             )
 
         # Apply shifts
+        exc_dates = parsed_exceptions.get(date_col, set())
         df[date_col] = df.apply(
             lambda row: (
                 row[date_col]  # noqa: B023
                 + pd.Timedelta(days=shift_dict.get(row[patient_id_col], 0))
-                if row[date_col] is not None and row[patient_id_col] in shift_dict  # noqa: B023
+                if row[date_col] is not None  # noqa: B023
+                and row[patient_id_col] in shift_dict  # noqa: B023
+                and row[date_col].date() not in exc_dates  # noqa: B023
                 else row[date_col]  # noqa: B023
             ),
             axis=1,
@@ -175,9 +185,7 @@ def apply_date_shifts(
         # Convert back to date-only format (removes time component)
         df[date_col] = df[date_col].apply(
             lambda x: (
-                x.date()
-                if isinstance(x, (pd.Timestamp, datetime, date))
-                else None
+                x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
             ),
         )
 
@@ -256,6 +264,7 @@ def shift_excel_dates(
             header_row = default_header_row
             sheet_date_columns: list[str] | None = None
             skip_rows_after_header: list[int] | None = None
+            sheet_shift_exceptions: dict[str, list[str]] | None = None
 
             if sheet_name in sheet_configs:
                 config = sheet_configs[cast(str, sheet_name)]
@@ -263,6 +272,7 @@ def shift_excel_dates(
                 date_columns: list[str] = cast(list[str], config["date_columns"])
                 header_row = cast(int, config.get("header_row", header_row))
                 skip_rows_after_header = config.get("skip_rows_after_header")
+                sheet_shift_exceptions = config.get("shift_exceptions")
                 sheet_date_columns = date_columns
                 logger.info(
                     "Shifting %d date column(s) in sheet '%s'",
@@ -292,6 +302,7 @@ def shift_excel_dates(
                     date_columns,
                     shift_mappings,
                     date_format=None,
+                    shift_exceptions=sheet_shift_exceptions,
                 )
 
             _excel._write_sheet_with_structure(
@@ -397,9 +408,7 @@ def shift_excel_dates_inplace(
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
         date_columns: list[str] = cast(list[str], config["date_columns"])
         header_row: int = cast(int, config.get("header_row", 0))
-        skip_rows_after_header: list[int] | None = config.get(
-            "skip_rows_after_header"
-        )
+        skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
 
         max_col = ws.max_column or 0
         if not max_col:
@@ -434,6 +443,21 @@ def shift_excel_dates_inplace(
         if not date_col_indices:
             continue
 
+        # Pre-parse exception dates once per column
+        parsed_exceptions: dict[str, set[date]] = {}
+        shift_exceptions_config: dict[str, list[str]] | None = config.get(
+            "shift_exceptions"
+        )
+        if shift_exceptions_config:
+            for exc_col, exc_values in shift_exceptions_config.items():
+                parsed_set: set[date] = set()
+                for v in exc_values:
+                    ts = _parse._parse_date_value(v)
+                    if ts is not None:
+                        parsed_set.add(ts.date())
+                if parsed_set:
+                    parsed_exceptions[exc_col] = parsed_set
+
         skip_row_set: set[int] = (
             {idx + 1 for idx in skip_rows_after_header}
             if skip_rows_after_header
@@ -455,7 +479,7 @@ def shift_excel_dates_inplace(
             pid = _parse._normalize_patient_id(pid_cell.value)
             shift_days = shift_dict.get(pid) if pid is not None else None
 
-            for date_col_idx in date_col_indices.values():
+            for col_name, date_col_idx in date_col_indices.items():
                 cell = ws.cell(row=row_idx, column=date_col_idx)
                 original_value = cell.value
                 parsed = _parse._parse_date_value(original_value)
@@ -468,6 +492,10 @@ def shift_excel_dates_inplace(
                     continue
 
                 if shift_days is None:
+                    continue
+
+                exc_dates = parsed_exceptions.get(col_name, set())
+                if exc_dates and parsed.date() in exc_dates:
                     continue
 
                 shifted = parsed + pd.Timedelta(days=shift_days)
