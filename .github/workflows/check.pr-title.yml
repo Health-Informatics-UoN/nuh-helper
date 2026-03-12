@@ -15,5 +15,6 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: health-informatics-uon/workflows/.github/workflows/pr-title.yml@main
+      - name: 'Check PR title'
+        uses: health-informatics-uon/workflows/.github/workflows/pr-title.yml@main
         secrets: inherit
