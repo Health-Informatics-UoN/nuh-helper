@@ -12,11 +12,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - release:
-        uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@main
-        with:
-          node-version: '24'
-        secrets: inherit
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@main
+    with:
+      node-version: '24'
+    secrets: inherit

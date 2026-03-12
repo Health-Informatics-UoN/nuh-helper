@@ -6,7 +6,5 @@ permissions:
 
 jobs:
   dependency-review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: health-informatics-uon/workflows/.github/workflows/dependency-review.yml@main
-        secrets: inherit
+    uses: health-informatics-uon/workflows/.github/workflows/dependency-review.yml@main
+    secrets: inherit
