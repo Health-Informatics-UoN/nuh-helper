@@ -12,24 +12,7 @@ on:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      # Install Semantic Release and its plugins global
-      - name: Install Semantic Release and plugins
-        run: |
-          npm install -g semantic-release @semantic-release/commit-analyzer @semantic-release/exec @semantic-release/release-notes-generator @semantic-release/changelog @semantic-release/github
-
-      # Run Semantic Release
-      - name: Run Semantic Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: semantic-release
+    uses: health-informatics-uon/workflows/.github/workflows/semantic-release.yml@main
+    with:
+      node-version: '24'
+    secrets: inherit
