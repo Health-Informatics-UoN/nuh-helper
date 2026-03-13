@@ -1,4 +1,5 @@
 """Unit tests for nuh_helper.date_shift"""
+
 from datetime import date, datetime
 from pathlib import Path
 
@@ -211,13 +212,13 @@ class TestDescriptionMergedRanges:
 
 
 class TestShiftExcelDatesWithComplexLayout:
-    """Integration tests: header_row, skip_rows_after_header, merged cells, 
+    """Integration tests: header_row, skip_rows_after_header, merged cells,
     patient sheet from config."""
 
     def _make_excel_with_complex_header(
         self, path: Path, sheet_name: str = "patients"
     ) -> None:
-        """Create an xlsx with: row0 merged title, row1 description, row2 header, row3 
+        """Create an xlsx with: row0 merged title, row1 description, row2 header, row3
         data-type, row4+ data."""
         wb = Workbook()
         ws = wb.active
@@ -250,7 +251,7 @@ class TestShiftExcelDatesWithComplexLayout:
     def test_header_row_and_skip_rows_after_header_produce_correct_columns(
         self, tmp_path: Path
     ) -> None:
-        """With header_row=2 and skip_rows_after_header=[3], 
+        """With header_row=2 and skip_rows_after_header=[3],
         column names come from row 2, row 3 excluded."""
         xlsx = tmp_path / "in.xlsx"
         self._make_excel_with_complex_header(xlsx)
@@ -282,7 +283,7 @@ class TestShiftExcelDatesWithComplexLayout:
         self, tmp_path: Path
     ) -> None:
         """When patient_sheet is in sheet_configs, its header_row is used
-         (no patient_header_row arg)."""
+        (no patient_header_row arg)."""
         xlsx = tmp_path / "in.xlsx"
         self._make_excel_with_complex_header(xlsx)
         out = tmp_path / "out.xlsx"
@@ -404,3 +405,131 @@ class TestApplyDateShifts:
             df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
         )
         assert df["visit_date"].iloc[0] == original_visit
+
+
+class TestApplyDateShiftsExceptions:
+    def _make_mappings(self, patient_id: str, shift_days: int) -> pd.DataFrame:
+        return pd.DataFrame({"patient_id": [patient_id], "shift_days": [shift_days]})
+
+    def test_exception_date_is_not_shifted(self) -> None:
+        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2024-12-31"]})
+        result = apply_date_shifts(
+            df,
+            "patient_id",
+            ["visit_date"],
+            self._make_mappings("P001", 10),
+            shift_exceptions={"visit_date": ["2024-12-31"]},
+        )
+        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
+
+    def test_non_exception_date_in_same_column_is_shifted(self) -> None:
+        df = pd.DataFrame(
+            {
+                "patient_id": ["P001", "P002"],
+                "visit_date": ["2024-12-31", "2023-06-01"],
+            }
+        )
+        mappings = pd.DataFrame(
+            {"patient_id": ["P001", "P002"], "shift_days": [10, 10]}
+        )
+        result = apply_date_shifts(
+            df,
+            "patient_id",
+            ["visit_date"],
+            mappings,
+            shift_exceptions={"visit_date": ["2024-12-31"]},
+        )
+        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
+        assert result["visit_date"].iloc[1] == date(2023, 6, 11)
+
+    def test_exception_only_applies_to_specified_column(self) -> None:
+        df = pd.DataFrame(
+            {
+                "patient_id": ["P001"],
+                "col_a": ["2024-12-31"],
+                "col_b": ["2024-12-31"],
+            }
+        )
+        result = apply_date_shifts(
+            df,
+            "patient_id",
+            ["col_a", "col_b"],
+            self._make_mappings("P001", 5),
+            shift_exceptions={"col_a": ["2024-12-31"]},
+        )
+        assert result["col_a"].iloc[0] == date(2024, 12, 31)
+        assert result["col_b"].iloc[0] == date(2025, 1, 5)
+
+    def test_multiple_exception_dates(self) -> None:
+        df = pd.DataFrame(
+            {
+                "patient_id": ["P001", "P001", "P001"],
+                "visit_date": ["2024-12-31", "2024-06-30", "2023-01-15"],
+            }
+        )
+        result = apply_date_shifts(
+            df,
+            "patient_id",
+            ["visit_date"],
+            self._make_mappings("P001", 7),
+            shift_exceptions={"visit_date": ["2024-12-31", "2024-06-30"]},
+        )
+        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
+        assert result["visit_date"].iloc[1] == date(2024, 6, 30)
+        assert result["visit_date"].iloc[2] == date(2023, 1, 22)
+
+    def test_no_exceptions_kwarg_shifts_normally(self) -> None:
+        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2024-12-31"]})
+        result = apply_date_shifts(
+            df,
+            "patient_id",
+            ["visit_date"],
+            self._make_mappings("P001", 10),
+            shift_exceptions=None,
+        )
+        assert result["visit_date"].iloc[0] == date(2025, 1, 10)
+
+
+class TestShiftExcelDatesExceptionsIntegration:
+    """Integration tests for shift_exceptions passed via sheet_configs."""
+
+    def _make_excel(self, path: Path) -> None:
+        wb = Workbook()
+        ws = wb.active
+        assert ws is not None
+        ws.title = "patients"
+        ws["A1"] = "patient_id"
+        ws["B1"] = "last_alive"
+        ws["A2"] = "P001"
+        ws["B2"] = "2023-06-01"
+        ws["A3"] = "P002"
+        ws["B3"] = "2024-12-31"
+        wb.save(path)
+
+    def test_exception_date_unchanged_other_dates_shifted(self, tmp_path: Path) -> None:
+        xlsx = tmp_path / "in.xlsx"
+        self._make_excel(xlsx)
+        out = tmp_path / "out.xlsx"
+        sheet_configs = {
+            "patients": {
+                "patient_id_col": "patient_id",
+                "date_columns": ["last_alive"],
+                "shift_exceptions": {"last_alive": ["2024-12-31"]},
+            }
+        }
+        shift_excel_dates(
+            input_file=str(xlsx),
+            output_file=str(out),
+            patient_sheet="patients",
+            patient_id_col="patient_id",
+            sheet_configs=sheet_configs,
+            linking_table_output=str(tmp_path / "linking.csv"),
+            seed=42,
+        )
+        df = pd.read_excel(str(out), sheet_name="patients")
+        p001_date = df.loc[df["patient_id"] == "P001", "last_alive"].iloc[0]
+        p002_date = df.loc[df["patient_id"] == "P002", "last_alive"].iloc[0]
+        # P002's date is an exception — must be unchanged
+        assert pd.Timestamp(p002_date).date() == date(2024, 12, 31)
+        # P001's date must have been shifted (seed=42 gives a non-zero shift)
+        assert pd.Timestamp(p001_date).date() != date(2023, 6, 1)
