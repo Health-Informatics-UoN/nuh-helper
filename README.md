@@ -190,4 +190,4 @@ generate_scan_report(
 )
 ```
 
-Keys are CSV filenames. Excluded columns are omitted from the Field Overview and value sheets entirely. Tables not listed in the dict are unaffected.
+Keys are CSV filenames. Excluded columns still appear in the Field Overview and as column headers in the value sheets, but no values are collected or shown for them. Tables not listed in the dict are unaffected.

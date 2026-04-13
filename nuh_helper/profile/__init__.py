@@ -81,9 +81,11 @@ def generate_scan_report(
         csv_files: Paths to the CSV files to profile.
         output_path: Path for the output Excel file.
         min_cell_count: Minimum frequency for a value to appear in the report.
-        excluded_columns: Per-file column names to omit from profiling. Keys
+        excluded_columns: Per-file columns to skip when collecting values. Keys
             are CSV filenames (e.g. ``"patients.csv"``), values are lists of
-            column names to exclude. For example::
+            column names. The columns still appear in the Field Overview and
+            value sheet headers, but no values are collected for them. For
+            example::
 
                 excluded_columns={"patients.csv": ["dob", "nhs_number"]}
     """
@@ -94,8 +96,7 @@ def generate_scan_report(
     for csv_file in csv_files:
         csv_file = Path(csv_file)
         header = read_csv_header(csv_file.as_posix())
-        skip = (excluded_columns or {}).get(csv_file.name, [])
-        fields = [f for f in header if f not in skip]
+        fields = header
         logger.info("Scanning '%s' (%d field(s))", csv_file.name, len(fields))
         tables.append(
             {"name": csv_file.name, "path": csv_file.as_posix(), "fields": fields}
@@ -127,6 +128,8 @@ def generate_scan_report(
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
         value_data, row_count = scan_csv_values(table["path"], min_cell_count)
+        for col in (excluded_columns or {}).get(table["name"], []):
+            value_data[col] = []
         table_value_data[table_name_indexed] = value_data
 
         table_sheet.append(

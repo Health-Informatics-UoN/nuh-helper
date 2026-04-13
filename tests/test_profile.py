@@ -46,14 +46,26 @@ def value_sheet_columns(wb: openpyxl.Workbook, sheet_name: str) -> list[str]:
     return [headers[i] for i in range(0, len(headers), 2)]
 
 
+def value_sheet_data(
+    wb: openpyxl.Workbook, sheet_name: str, column: str
+) -> list[str]:
+    """Return the values listed under a given column in a value sheet."""
+    ws = wb[sheet_name]
+    rows = list(ws.iter_rows(values_only=True))
+    header = rows[0]
+    col_index = next(i for i, v in enumerate(header) if v == column)
+    return [row[col_index] for row in rows[1:] if row[col_index] not in (None, "")]
+
+
 def test_no_excluded_columns(simple_csv: Path, tmp_path: Path) -> None:
     out = tmp_path / "report.xlsx"
     generate_scan_report([str(simple_csv)], output_path=str(out))
     wb = openpyxl.load_workbook(out)
     assert field_overview_fields(wb, "patients.csv") == ["id", "name", "dob", "score"]
+    assert value_sheet_columns(wb, "patients.csv") == ["id", "name", "dob", "score"]
 
 
-def test_excluded_columns_removed_from_field_overview(
+def test_excluded_column_still_in_field_overview(
     simple_csv: Path, tmp_path: Path
 ) -> None:
     out = tmp_path / "report.xlsx"
@@ -63,10 +75,10 @@ def test_excluded_columns_removed_from_field_overview(
         excluded_columns={"patients.csv": ["dob"]},
     )
     wb = openpyxl.load_workbook(out)
-    assert field_overview_fields(wb, "patients.csv") == ["id", "name", "score"]
+    assert "dob" in field_overview_fields(wb, "patients.csv")
 
 
-def test_excluded_columns_removed_from_value_sheet(
+def test_excluded_column_still_in_value_sheet_header(
     simple_csv: Path, tmp_path: Path
 ) -> None:
     out = tmp_path / "report.xlsx"
@@ -76,19 +88,29 @@ def test_excluded_columns_removed_from_value_sheet(
         excluded_columns={"patients.csv": ["dob"]},
     )
     wb = openpyxl.load_workbook(out)
-    assert value_sheet_columns(wb, "patients.csv") == ["id", "name", "score"]
+    assert "dob" in value_sheet_columns(wb, "patients.csv")
 
 
-def test_multiple_excluded_columns(simple_csv: Path, tmp_path: Path) -> None:
+def test_excluded_column_has_no_values(simple_csv: Path, tmp_path: Path) -> None:
     out = tmp_path / "report.xlsx"
     generate_scan_report(
         [str(simple_csv)],
         output_path=str(out),
-        excluded_columns={"patients.csv": ["dob", "id"]},
+        excluded_columns={"patients.csv": ["dob"]},
     )
     wb = openpyxl.load_workbook(out)
-    assert field_overview_fields(wb, "patients.csv") == ["name", "score"]
-    assert value_sheet_columns(wb, "patients.csv") == ["name", "score"]
+    assert value_sheet_data(wb, "patients.csv", "dob") == []
+
+
+def test_non_excluded_column_still_has_values(simple_csv: Path, tmp_path: Path) -> None:
+    out = tmp_path / "report.xlsx"
+    generate_scan_report(
+        [str(simple_csv)],
+        output_path=str(out),
+        excluded_columns={"patients.csv": ["dob"]},
+    )
+    wb = openpyxl.load_workbook(out)
+    assert value_sheet_data(wb, "patients.csv", "name") != []
 
 
 def test_exclusions_are_per_table(
@@ -102,8 +124,8 @@ def test_exclusions_are_per_table(
         excluded_columns={"patients.csv": ["dob"]},
     )
     wb = openpyxl.load_workbook(out)
-    assert "dob" not in field_overview_fields(wb, "patients.csv")
-    assert "visit_date" in field_overview_fields(wb, "visits.csv")
+    assert value_sheet_data(wb, "patients.csv", "dob") == []
+    assert value_sheet_data(wb, "visits.csv", "visit_date") != []
 
 
 def test_excluded_nonexistent_column_is_ignored(
@@ -116,4 +138,4 @@ def test_excluded_nonexistent_column_is_ignored(
         excluded_columns={"patients.csv": ["nonexistent"]},
     )
     wb = openpyxl.load_workbook(out)
-    assert field_overview_fields(wb, "patients.csv") == ["id", "name", "dob", "score"]
+    assert value_sheet_data(wb, "patients.csv", "name") != []
