@@ -49,6 +49,33 @@ shift_excel_dates(
 )
 ```
 
+### Excluding fixed study dates with `shift_exceptions`
+
+Some columns contain a mix of patient-specific dates (which should be shifted) and fixed study-wide dates (e.g. an end-of-study date) that must remain unchanged. Use `shift_exceptions` in `sheet_configs` to list any date values that should never be shifted:
+
+```python
+sheet_configs = {
+    "patients": {
+        "patient_id_col": "patient_id",
+        "date_columns": ["last_alive"],
+        "shift_exceptions": {
+            "last_alive": ["2024-12-31"],  # end-of-study date — never shift
+        },
+    },
+}
+
+shift_excel_dates(
+    input_file="input.xlsx",
+    output_file="output.xlsx",
+    patient_sheet="patients",
+    patient_id_col="patient_id",
+    sheet_configs=sheet_configs,
+    seed=42,
+)
+```
+
+The exception date strings are parsed with the same flexible parser used for all date values (supports multiple formats and placeholder strings). Exceptions are matched against the parsed date, so `"2024-12-31"` and `"31-12-2024"` both match the same calendar date.
+
 ### Reproducible Shifts with Linking Table
 
 To use the same shifts across multiple runs, save and reuse a linking table:
@@ -107,6 +134,7 @@ The function accepts the same parameters as `shift_excel_dates` except `date_for
   - `date_columns`: List of date column names to shift
   - `header_row`: (Optional) Zero-based row index for the row that contains column names
   - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
+  - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values.
 - `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead.
 - `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead.
 - `min_shift_days` / `max_shift_days`: Range of days to shift (default: -15 to 15)

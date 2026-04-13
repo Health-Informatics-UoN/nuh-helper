@@ -89,40 +89,28 @@ def _read_sheet_with_structure(
             # Pandas-friendly column names (no None)
             columns = []
             for i, v in enumerate(header_values):
-                if v is None or (
-                    isinstance(v, float) and pd.isna(cast("float", v))
-                ):
+                if v is None or (isinstance(v, float) and pd.isna(cast("float", v))):
                     columns.append(f"Unnamed: {i}")
                 else:
                     columns.append(str(v).strip() or f"Unnamed: {i}")
 
             if header_row > 0:
-                description_merged_ranges = _description_merged_ranges(
-                    ws, header_row
-                )
+                description_merged_ranges = _description_merged_ranges(ws, header_row)
 
             # Description rows (rows before header)
             description_rows = (
-                full_df.iloc[:header_row].values.tolist()
-                if header_row > 0
-                else []
+                full_df.iloc[:header_row].values.tolist() if header_row > 0 else []
             )
             # Data rows: everything after header, optionally excluding some rows
             data_block = full_df.iloc[header_row + 1 :]
             if skip_rows_after_header:
                 # Drop by 0-based index (data_block index = original row)
-                to_drop = [
-                    i
-                    for i in data_block.index
-                    if i in skip_rows_after_header
-                ]
+                to_drop = [i for i in data_block.index if i in skip_rows_after_header]
                 data_block = data_block.drop(index=to_drop, errors="ignore")
 
             data_df = pd.DataFrame(data_block.values, columns=columns)
             description_df = (
-                full_df.iloc[:header_row].copy()
-                if header_row > 0
-                else pd.DataFrame()
+                full_df.iloc[:header_row].copy() if header_row > 0 else pd.DataFrame()
             )
             wb.close()
             return (
@@ -136,17 +124,13 @@ def _read_sheet_with_structure(
     if header_row == 0:
         description_rows = []
         description_df = pd.DataFrame()
-        data_df = pd.read_excel(
-            excel_file, sheet_name=sheet_name, header=0
-        )
+        data_df = pd.read_excel(excel_file, sheet_name=sheet_name, header=0)
         if skip_rows_after_header:
             data_df = data_df.drop(index=skip_rows_after_header, errors="ignore")
     else:
         description_rows = full_df.iloc[:header_row].values.tolist()
         description_df = full_df.iloc[:header_row].copy()
-        data_df = pd.read_excel(
-            excel_file, sheet_name=sheet_name, header=header_row
-        )
+        data_df = pd.read_excel(excel_file, sheet_name=sheet_name, header=header_row)
         if skip_rows_after_header:
             data_df = data_df.drop(index=skip_rows_after_header, errors="ignore")
 
