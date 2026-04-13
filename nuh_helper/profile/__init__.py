@@ -73,7 +73,7 @@ def generate_scan_report(
     csv_files: list[str],
     output_path: str = SCAN_REPORT_FILE_NAME,
     min_cell_count: int = 1,
-    excluded_columns: list[str] | None = None,
+    excluded_columns: dict[str, list[str]] | None = None,
 ) -> str:
     """Generate a WhiteRabbit-compatible Scan Report from CSV files.
 
@@ -81,8 +81,11 @@ def generate_scan_report(
         csv_files: Paths to the CSV files to profile.
         output_path: Path for the output Excel file.
         min_cell_count: Minimum frequency for a value to appear in the report.
-        excluded_columns: Column names to omit from profiling entirely. Useful
-            for columns such as dates that are not needed in a scan report.
+        excluded_columns: Per-file column names to omit from profiling. Keys
+            are CSV filenames (e.g. ``"patients.csv"``), values are lists of
+            column names to exclude. For example::
+
+                excluded_columns={"patients.csv": ["dob", "nhs_number"]}
     """
     logger.info("Generating scan report for %d table(s)", len(csv_files))
 
@@ -91,7 +94,8 @@ def generate_scan_report(
     for csv_file in csv_files:
         csv_file = Path(csv_file)
         header = read_csv_header(csv_file.as_posix())
-        fields = [f for f in header if f not in (excluded_columns or [])]
+        skip = (excluded_columns or {}).get(csv_file.name, [])
+        fields = [f for f in header if f not in skip]
         logger.info("Scanning '%s' (%d field(s))", csv_file.name, len(fields))
         tables.append(
             {"name": csv_file.name, "path": csv_file.as_posix(), "fields": fields}

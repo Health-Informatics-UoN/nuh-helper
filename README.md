@@ -168,10 +168,26 @@ Profile a dataset and generate a Scan Report.
 ```python
 from nuh_helper import generate_scan_report
 
-
 csv_files = [
     "patients.csv",
+    "visits.csv",
 ]
 
 generate_scan_report(csv_files, min_cell_count=5)
 ```
+
+### Excluding columns from profiling
+
+Some columns (e.g. dates, free-text notes) are not useful in a scan report and can be excluded per file using `excluded_columns`:
+
+```python
+generate_scan_report(
+    csv_files,
+    excluded_columns={
+        "patients.csv": ["dob", "nhs_number"],
+        "visits.csv": ["visit_date"],
+    },
+)
+```
+
+Keys are CSV filenames. Excluded columns are omitted from the Field Overview and value sheets entirely. Tables not listed in the dict are unaffected.
