@@ -27,7 +27,7 @@ dev = [
     "pre-commit>=4.6.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
-    "ruff>=0.15.12",
+    "ruff>=0.15.13",
     "ty>=0.0.35",
     "types-openpyxl>=3.1.5.20260508",
 ]
