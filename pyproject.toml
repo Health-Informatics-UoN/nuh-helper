@@ -29,7 +29,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.15.13",
     "ty>=0.0.37",
-    "types-openpyxl>=3.1.5.20260508",
+    "types-openpyxl>=3.1.5.20260518",
 ]
 
 [tool.ruff.lint.pydocstyle]
