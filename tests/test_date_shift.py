@@ -533,3 +533,69 @@ class TestShiftExcelDatesExceptionsIntegration:
         assert pd.Timestamp(p002_date).date() == date(2024, 12, 31)
         # P001's date must have been shifted (seed=42 gives a non-zero shift)
         assert pd.Timestamp(p001_date).date() != date(2023, 6, 1)
+
+
+def test_skiprows(tmp_path: Path):
+    """tries to reproduct https://github.com/Health-Informatics-UoN/nuh-helper/issues/28"""
+    from nuh_helper import shift_excel_dates_inplace  # noqa: E402
+
+    sheet_configs = {
+        "patients": {
+            "patient_id_col": "patient_id",
+            "header_row": 0,
+            "skip_rows_after_header": [],
+            "date_columns": [
+                "dob",
+                "last_alive",
+            ],
+        },
+        "results": {
+            "patient_id_col": "patient_id",
+            "header_row": 0,
+            "skip_rows_after_header": [],
+            "date_columns": [
+                "date_result",
+            ],
+        },
+        "measurements": {
+            "patient_id_col": "p_id",
+            "header_row": 1,
+            "skip_rows_after_header": [2, 3],
+            "date_columns": [
+                "date8061",
+            ],
+        },
+    }
+
+    patients_src = Path(__file__).parent / "data/patients2.xlsx"
+    patients_out = tmp_path / "out-patients2.xlsx"
+    patients_map = tmp_path / "mapping-patients2.csv"
+
+    ## ###
+    ## act
+
+    # Shift dates in the Excel file
+    shift_excel_dates_inplace(
+        input_file=patients_src,
+        output_file=patients_out,
+        patient_sheet="patients",
+        patient_id_col="patient_id",
+        sheet_configs=sheet_configs,
+        min_shift_days=-3,
+        max_shift_days=+3,
+        seed=413413,
+        linking_table_output=patients_map,
+    )
+
+    ## ###
+    ## assert - load the resulting workbook and check to see if the skiprows were copied across
+
+    from openpyxl import load_workbook
+
+    out = load_workbook(patients_out, read_only=True, rich_text=False)
+    out_measurements = out["measurements"]
+
+    assert out_measurements["B3"].value == "a date in the iso format"
+    assert out_measurements["B4"].value == "might be postmortem"
+    assert out_measurements["C3"].value == "(with one intentional metric) value"
+    assert out_measurements["C4"].value == "may include decimals"
