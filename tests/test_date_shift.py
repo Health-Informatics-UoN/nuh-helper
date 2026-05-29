@@ -536,7 +536,7 @@ class TestShiftExcelDatesExceptionsIntegration:
 
 
 def test_skiprows(tmp_path: Path):
-    """tries to reproduct https://github.com/Health-Informatics-UoN/nuh-helper/issues/28"""
+    """tries to reproduce https://github.com/Health-Informatics-UoN/nuh-helper/issues/28"""
     from nuh_helper import shift_excel_dates_inplace  # noqa: E402
 
     sheet_configs = {
