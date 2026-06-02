@@ -535,7 +535,7 @@ class TestShiftExcelDatesExceptionsIntegration:
         assert pd.Timestamp(p001_date).date() != date(2023, 6, 1)
 
 
-def test_skiprows(tmp_path: Path):
+def test_skiprows(tmp_path: Path) -> None:
     """tries to reproduce https://github.com/Health-Informatics-UoN/nuh-helper/issues/28"""
     from nuh_helper import shift_excel_dates_inplace  # noqa: E402
 
@@ -588,7 +588,7 @@ def test_skiprows(tmp_path: Path):
     )
 
     ## ###
-    ## assert - load the resulting workbook and check to see if the skiprows were copied across
+    ## assert - load the resulting workbook and check to see if the skiprows were copied
 
     from openpyxl import load_workbook
 
