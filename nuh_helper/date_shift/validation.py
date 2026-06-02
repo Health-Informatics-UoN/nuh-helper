@@ -83,7 +83,7 @@ def format_errors(errors: list[Error]) -> str:
                 case PatientColumnMissing():
                     label = error.label
                     message += f"\tthere was no patient column {label=}\n"
-        return message
+    return message
 
 
 def inspect(sheet_file: Path, sheet_configs: dict) -> list[Error]:
