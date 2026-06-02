@@ -1,7 +1,4 @@
 from nuh_helper.date_shift.validation import (
-    Cell as Cell,
-)
-from nuh_helper.date_shift.validation import (
     Error as Error,
 )
 from nuh_helper.date_shift.validation import (
