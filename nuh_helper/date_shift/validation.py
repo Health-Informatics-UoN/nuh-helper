@@ -2,54 +2,41 @@
 spreadsheet has data in abnormal places. it's mean tot check for "little notes" which
 are outside of the CDM and may have undocumented patient data"""
 
+from dataclasses import dataclass
+from pathlib import Path
+
 from openpyxl.cell.cell import Cell
 from openpyxl.worksheet.worksheet import Worksheet
-from pathlib import Path
 
 
 class Error:
     """base class for the errors. has a simplified __eq__ for `assert error in list`"""
 
-    def __eq__(self, them: object) -> bool:
-        if type(self) is not type(them):
-            return False
-        return str(self) == str(them)
 
-
+@dataclass
 class ExcessRows(Error):
     """error indicating that there are extra rows in a spreadsheet that don't have a
     patient id and won't be shifted"""
 
-    def __init__(self, sheet_name: str, excess: list[int]) -> None:
-        self.sheet_name = sheet_name
-        self.excess = excess
-
-    def __str__(self) -> str:
-        return f"ExcessRows('{self.sheet_name}', {self.excess})"
+    sheet_name: str
+    excess: list[int]
 
 
+@dataclass
 class UnlabeledColumns(Error):
     """indication that there are columns with data but no header; probably notes in the
     margin about missing tests or (previously) dates related to patient's treatment to
     explain the data in the spreadsheet."""
 
-    def __init__(self, sheet_name: str, columns: list[int]) -> None:
-        self.sheet_name = sheet_name
-        self.columns = columns
-
-    def __str__(self) -> str:
-        return f"UnlabeledColumns('{self.sheet_name}', {self.columns})"
+    sheet_name: str
+    columns: list[int]
 
 
+@dataclass
 class PatientColumnMissing(Error):
     """used to indicate that the patien column wasn't found in the spreadsheet"""
-
-    def __init__(self, sheet_name: str, label: str) -> None:
-        self.sheet_name = sheet_name
-        self.name = label
-
-    def __str__(self) -> str:
-        return f"PatientColumnMissing('{self.sheet_name}', '{self.label}')"
+    sheet_name: str
+    label: str
 
 
 def format_errors(errors: list[Error]) -> str:
