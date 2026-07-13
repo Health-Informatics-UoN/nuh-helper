@@ -22,13 +22,13 @@ source = "vcs"
 
 [dependency-groups]
 dev = [
-    "coverage>=7.14.3",
+    "coverage>=7.15.0",
     "pandas-stubs>=3.0.3.260530",
     "pre-commit>=4.6.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
     "ruff>=0.15.20",
-    "ty>=0.0.55",
+    "ty>=0.0.56",
     "types-openpyxl>=3.1.5.20260518",
 ]
 
