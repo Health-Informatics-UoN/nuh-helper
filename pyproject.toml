@@ -22,14 +22,14 @@ source = "vcs"
 
 [dependency-groups]
 dev = [
-    "coverage>=7.14.1",
-    "pandas-stubs>=2.3.3.251201",
+    "coverage>=7.15.2",
+    "pandas-stubs>=3.0.3.260530",
     "pre-commit>=4.6.0",
-    "pytest>=9.0.2",
+    "pytest>=9.1.1",
     "pytest-cov>=7.0.0",
-    "ruff>=0.15.15",
-    "ty>=0.0.40",
-    "types-openpyxl>=3.1.5.20260508",
+    "ruff>=0.15.22",
+    "ty>=0.0.61",
+    "types-openpyxl>=3.1.5.20260518",
 ]
 
 [tool.ruff.lint.pydocstyle]
