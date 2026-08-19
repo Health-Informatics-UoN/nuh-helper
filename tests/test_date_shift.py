@@ -296,7 +296,7 @@ class TestShiftExcelDatesWithComplexLayout:
             },
         }
         """
-         Do not pass patient_header_row; patient sheet "patients" 
+         Do not pass patient_header_row; patient sheet "patients"
          is in config with header_row=2
          """
         shift_excel_dates(

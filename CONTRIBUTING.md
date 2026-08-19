@@ -50,4 +50,3 @@ CI runs the full test suite; ensure `uv run pytest` passes locally before openin
 Releases are made automatically through `semantic-release` and depend on PR titles.
 
 Thank you for contributing.
-
