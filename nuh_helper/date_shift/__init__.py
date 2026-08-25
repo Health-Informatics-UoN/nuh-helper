@@ -20,6 +20,11 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class ShiftFoundNonDate(Exception):
+    def __init__(self, row: int, col: int, val: str) -> None:
+        super().__init__(f"[{row}, {col}] {val=}")
+
+
 def _get_patient_ids_and_shift_mappings(
     input_file: str,
     patient_sheet: str,
@@ -526,4 +531,5 @@ __all__ = [
     "apply_date_shifts",
     "generate_shift_mappings",
     "load_shift_mappings",
+    "ShiftFoundNonDate",
 ]
