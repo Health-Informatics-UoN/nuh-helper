@@ -354,14 +354,20 @@ def shift_excel_dates_inplace(
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
         patient_id_col: Name of the column containing patient IDs in the patient sheet.
-        sheet_configs: Dictionary mapping sheet names to configuration dicts.
-                      Each config dict should have:
-                      - 'patient_id_col': Name of patient ID column in that sheet
-                      - 'date_columns': List of date column names to shift
-                      Optional per-sheet header handling:
-                      - 'header_row': zero-based row index of the column names (default 0)
-                      - 'skip_rows_after_header': list of zero-based row indices to exclude
-                        from data (e.g. a data-type row immediately below the header)
+        sheet_configs:
+          Dictionary mapping sheet names to configuration dicts.
+          Each config dict should have:
+          - 'patient_id_col': Name of patient ID column in that sheet
+          - 'date_columns': List of date column names to shift
+          Optional per-sheet header handling:
+          - 'header_row': zero-based row index of the column names (default 0)
+          - 'skip_rows_after_header': list of zero-based row indices to
+            exclude from data (e.g. a data-type row immediately below the
+            header)
+          - pass_as_is: a map of {column name: [value list]} of non-date
+            strings allowed in date cells. these are passed through
+            unchanged. blank entries, and, whitespace on the start/end of the
+            strings are always allowed.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
