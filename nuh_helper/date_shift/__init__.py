@@ -185,7 +185,7 @@ def apply_date_shifts(
         # Convert back to date-only format (removes time component)
         df[date_col] = df[date_col].apply(
             lambda x: (
-                x.date() if isinstance(x, (pd.Timestamp, datetime, date)) else None
+                x.date() if isinstance(x, pd.Timestamp | datetime | date) else None
             ),
         )
 
@@ -486,7 +486,7 @@ def shift_excel_dates_inplace(
 
                 if parsed is None:
                     if original_value is not None and not isinstance(
-                        original_value, (datetime, date)
+                        original_value, datetime | date
                     ):
                         cell.value = None
                     continue
