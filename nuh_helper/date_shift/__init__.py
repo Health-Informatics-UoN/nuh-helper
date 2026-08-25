@@ -494,35 +494,26 @@ def shift_excel_dates_inplace(
                 cell = ws.cell(row=row_idx, column=date_col_idx)
                 original_value = cell.value
 
-                # block non-dates in date columns
-                if (
-                    not isinstance(original_value, datetime)
-                    and str(original_value).strip() != ""
-                ):
-                    page_config = sheet_configs[sheet_name]
+                # skip blank values
+                if str(original_value).strip() == "":
+                    continue
 
-                    if (
-                        ("pass_as_is" in page_config)
-                        and (col_name in page_config["pass_as_is"])
-                        and (
-                            original_value.strip()
-                            in page_config["pass_as_is"][col_name]
-                        )
-                    ):
+                # block non-dates in date columns
+                if not isinstance(original_value, datetime | date):
+                    # check if it's one of the non-dates allowed
+                    page_config = sheet_configs[sheet_name]
+                    pass_as_is = page_config.get("pass_as_is", {})
+                    allowed_non_dates = pass_as_is.get(col_name, [])
+                    if original_value.strip() in allowed_non_dates:
                         continue
 
                     raise ShiftFoundNonDate(
                         sheet_name, row_idx, date_col_idx, col_name, original_value
                     )
 
+                # original_value is datetime | date
+                # ... so parsed should always succeed
                 parsed = _parse._parse_date_value(original_value)
-
-                if parsed is None:
-                    if original_value is not None and not isinstance(
-                        original_value, datetime | date
-                    ):
-                        cell.value = None
-                    continue
 
                 if shift_days is None:
                     continue
@@ -554,10 +545,10 @@ from nuh_helper.date_shift.mappings import (  # noqa: E402
 )
 
 __all__ = [
-    "shift_excel_dates",
-    "shift_excel_dates_inplace",
     "apply_date_shifts",
     "generate_shift_mappings",
     "load_shift_mappings",
+    "shift_excel_dates",
+    "shift_excel_dates_inplace",
     "ShiftFoundNonDate",
 ]

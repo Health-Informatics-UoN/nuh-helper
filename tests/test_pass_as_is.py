@@ -63,7 +63,7 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
     assert str(worksheet.cell(5, 3).value) == "2016-09-17 00:00:00"
     assert worksheet.cell(6, 3).value == "2016-07-18 idk"
 
-    # the importnat column to check - the dates
+    # the important column to check - the dates
     assert worksheet.cell(1, 2).value == "birthday"
     assert worksheet.cell(2, 2).value == "dob"
 
