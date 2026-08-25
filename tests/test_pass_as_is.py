@@ -37,7 +37,7 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
     if not allow_passthrough:
         with pytest.raises(ShiftFoundNonDate) as info:
             body()
-        assert str(info.value) == "[5, 2] val='mssing'"
+        assert str(info.value) == "page='page-data'[5, 2] val='mssing'"
         return
     else:
         sheet_configs["page-data"]["pass_as_is"] = {"dob": ["mssing"]}
