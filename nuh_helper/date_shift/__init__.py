@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class ShiftFoundNonDate(Exception):
-    def __init__(self, page: str, row: int, col: int, val: str) -> None:
-        super().__init__(f"{page=}[{row}, {col}] {val=}")
+    def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
+        super().__init__(f"{page=}[{row}, {col} @ {col_name=}] {val=}")
 
 
 def _get_patient_ids_and_shift_mappings(
@@ -493,8 +493,20 @@ def shift_excel_dates_inplace(
                     not isinstance(original_value, datetime)
                     and str(original_value).strip() != ""
                 ):
+                    page_config = sheet_configs[sheet_name]
+
+                    if (
+                        ("pass_as_is" in page_config)
+                        and (col_name in page_config["pass_as_is"])
+                        and (
+                            original_value.strip()
+                            in page_config["pass_as_is"][col_name]
+                        )
+                    ):
+                        continue
+
                     raise ShiftFoundNonDate(
-                        sheet_name, row_idx, date_col_idx, original_value
+                        sheet_name, row_idx, date_col_idx, col_name, original_value
                     )
 
                 parsed = _parse._parse_date_value(original_value)
