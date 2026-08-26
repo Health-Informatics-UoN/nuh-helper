@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
+from nuh_helper.date_shift import UnknownPatient
 
 
 def test_missing_id(tmp_path: Path) -> None:
@@ -11,14 +12,17 @@ def test_missing_id(tmp_path: Path) -> None:
         "patients": {
             "patient_id_col": "ptid",
             "header_row": 1,
-            "skip_rows_after_header": [3],
+            "skip_rows_after_header": [2],
             "date_columns": ["dob"],
         },
         "deceased": {
             "patient_id_col": "patient_id",
             "header_row": 2,
-            "skip_rows_after_header": [4, 5],
-            "date_columns": ["dob"],
+            "skip_rows_after_header": [3, 4],
+            "date_columns": [
+                "deaddat",
+                "diagdat",
+            ],
         },
     }
 
@@ -27,7 +31,7 @@ def test_missing_id(tmp_path: Path) -> None:
     linking_table_old = tmp_path / "linking_table_old.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
-    if True:
+    with pytest.raises(UnknownPatient) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -41,4 +45,4 @@ def test_missing_id(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-        pytest.fail("the above code should generate an exception")
+    assert str(info.value._message) == "Unknown id='nuh006' on page='deceased'"
