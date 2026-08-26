@@ -9,6 +9,12 @@ from nuh_helper.date_shift import ShiftFoundNonDate
 
 @pytest.mark.parametrize("allow_passthrough", [True, False])
 def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
+
+    source_file = Path(__file__).parent / "data/passed/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/passed/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
     sheet_configs = {
         "page-data": {
             "patient_id_col": "pid",
@@ -18,11 +24,9 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
         }
     }
 
-    output_path = tmp_path / "target.xlsx"
-
     def body() -> None:
         shift_excel_dates_inplace(
-            input_file=str(Path(__file__).parent / "data/passed/workbook.xlsx"),
+            input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="page-data",
             patient_id_col="pid",
@@ -30,8 +34,8 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
             min_shift_days=-20,
             max_shift_days=-1,
             seed=14333,
-            linking_table_path=str(Path(__file__).parent / "data/passed/offsets.csv"),
-            linking_table_output=str(tmp_path / "offsets.csv"),
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
         )
 
     if not allow_passthrough:
@@ -69,7 +73,5 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
 
     assert str(worksheet.cell(3, 2).value) == "2001-12-17 00:00:00"
     assert str(worksheet.cell(4, 2).value) == "1993-09-20 00:00:00"
+    assert str(worksheet.cell(5, 2).value) == "mssing"  # change that's under test
     assert str(worksheet.cell(6, 2).value) == "1999-11-30 00:00:00"
-
-    # change that's under test
-    assert worksheet.cell(5, 2).value == "mssing"
