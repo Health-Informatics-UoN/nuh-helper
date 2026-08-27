@@ -20,6 +20,15 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class RowMissingID(Exception):
+    def __init__(
+        self, sheet_name: str, row_idx: int, col_index: int, value: str
+    ) -> None:
+        message = f"missing id for [{sheet_name=}, {row_idx}, {col_index}] = {value=}"
+        super().__init__(message)
+        self._message = message
+
+
 def _get_patient_ids_and_shift_mappings(
     input_file: str,
     patient_sheet: str,
@@ -477,6 +486,21 @@ def shift_excel_dates_inplace(
 
             pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
             pid = _parse._normalize_patient_id(pid_cell.value)
+            if pid is None:
+                # if there's no PID check that all columns are blank
+                for blank_col_index in range(1, (1 + ws.max_column)):
+                    cell = ws.cell(row=row_idx, column=blank_col_index)
+                    original_value = cell.value
+                    if original_value is None or str(original_value).strip() == "":
+                        continue
+
+                    # there's data where there shouldn't be; raise an error
+                    raise RowMissingID(
+                        sheet_name, row_idx, blank_col_index, str(original_value)
+                    )
+
+                # all columns were blank for this row; skip it
+                continue
             shift_days = shift_dict.get(pid) if pid is not None else None
 
             for col_name, date_col_idx in date_col_indices.items():
