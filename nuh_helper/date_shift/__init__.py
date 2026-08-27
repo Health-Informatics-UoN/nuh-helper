@@ -20,6 +20,45 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class DateColumnMissing(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        super().__init__(f"date {column_name=} is missing from the cdm {page_name=}")
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class IgnoredColumnMissing(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        super().__init__(
+            f"un-shifted {column_name=} is missing from the cdm {page_name=}"
+        )
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class ExtraColumn(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        super().__init__(
+            f"{column_name=} is neither ignored or shifted in the cdm {page_name=}"
+        )
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class PageMissing(Exception):
+    def __init__(self, page_name: str) -> None:
+        super().__init__(
+            f"an expected page was missing from the source cdm {page_name=}"
+        )
+        self._page_name = page_name
+
+
+class ExtraPage(Exception):
+    def __init__(self, page_name: str) -> None:
+        super().__init__(f"an unexpected page was found in the source cdm {page_name=}")
+        self._page_name = page_name
+
+
 def _get_patient_ids_and_shift_mappings(
     input_file: str,
     patient_sheet: str,
