@@ -336,6 +336,7 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
+    clamp_date: date | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -364,6 +365,9 @@ def shift_excel_dates_inplace(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional zero-based row indices to exclude from patient data.
+        clamp_date:
+          optional "maximum date value" for shifted date columns. dates in un
+          shifted columns aren't changed.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
