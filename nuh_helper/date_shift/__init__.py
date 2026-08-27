@@ -503,12 +503,15 @@ def shift_excel_dates_inplace(
                     continue
 
                 shifted = parsed + pd.Timedelta(days=shift_days)
+                shifted_datetime = shifted.to_pydatetime()
+                if clamp_date is not None and clamp_date < shifted_datetime:
+                    shifted_datetime = clamp_date
                 if isinstance(original_value, date) and not isinstance(
                     original_value, datetime
                 ):
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.value = cast(Any, shifted_datetime.date())
                 else:
-                    cell.value = cast(Any, shifted.to_pydatetime())
+                    cell.value = cast(Any, shifted_datetime)
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)
