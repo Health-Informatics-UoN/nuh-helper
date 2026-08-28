@@ -438,9 +438,18 @@ def shift_excel_dates_inplace(
     wb = load_workbook(output_file, keep_links=False)
     wb.defined_names.clear()
 
+    # check for sheets we didn't have an explanation for
+    for sheet_name in wb.sheetnames:
+        if sheet_name not in sheet_configs:
+            raise ExtraPage(sheet_name)
+
     for sheet_name, config in sheet_configs.items():
         if sheet_name not in wb.sheetnames:
             raise PageMissing(sheet_name)
+
+        if isinstance(config, str) and config == "skip":
+            # it's a skipped sheet
+            continue
 
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
