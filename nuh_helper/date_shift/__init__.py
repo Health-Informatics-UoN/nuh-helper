@@ -388,10 +388,13 @@ def shift_excel_dates_inplace(
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
         patient_id_col: Name of the column containing patient IDs in the patient sheet.
-        sheet_configs: Dictionary mapping sheet names to configuration dicts.
+        sheet_configs:Dictionary mapping sheet names to configuration dicts,
+                        or, the string 'skip' if that sheet should be
+                        skipped but is a valid part of the CDM.
                       Each config dict should have:
                       - 'patient_id_col': Name of patient ID column in that sheet
                       - 'date_columns': List of date column names to shift
+                      - 'text_columns': List of non-date columns to ignore
                       Optional per-sheet header handling:
                       - 'header_row': zero-based row index of the column names (default 0)
                       - 'skip_rows_after_header': list of zero-based row indices to exclude
