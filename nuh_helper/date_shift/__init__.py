@@ -473,11 +473,7 @@ def shift_excel_dates_inplace(
             if col in col_index:
                 date_col_indices[col] = col_index[col]
             else:
-                logger.warning(
-                    "Date column '%s' not found in sheet '%s', skipping",
-                    col,
-                    sheet_name,
-                )
+                raise DateColumnMissing(sheet_name, col)
 
         if not date_col_indices:
             continue
