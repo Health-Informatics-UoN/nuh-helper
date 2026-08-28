@@ -467,6 +467,10 @@ def shift_excel_dates_inplace(
             ):
                 raise ExtraColumn(sheet_name, val)
 
+        for text_column in config["text_columns"]:
+            if text_column not in header_values:
+                raise TextColumnMissing(sheet_name, text_column)
+
         if sheet_patient_id_col not in col_index:
             raise ValueError(
                 f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"  # noqa: E501

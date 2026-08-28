@@ -6,10 +6,11 @@ from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import (
     DateColumnMissing,
     ExtraColumn,
+    TextColumnMissing,
 )
 
 
-def test_data_column_missing(tmp_path: Path) -> None:
+def test_date_column_missing(tmp_path: Path) -> None:
 
     source_file = Path(__file__).parent / "data/structural.xlsx"
     output_path = tmp_path / "target.xlsx"
@@ -25,7 +26,7 @@ def test_data_column_missing(tmp_path: Path) -> None:
             ],
             "text_columns": [
                 "ptid",
-                # "food",
+                "food",
                 # "a-missing-text-column",
             ],
             "header_row": 0,
@@ -107,14 +108,14 @@ def test_text_column_missing(tmp_path: Path) -> None:
             ],
             "text_columns": [
                 "ptid",
-                # "food",
+                "food",
                 "a-missing-text-column",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(DateColumnMissing) as info:
+    with pytest.raises(TextColumnMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
