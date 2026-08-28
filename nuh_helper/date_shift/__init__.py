@@ -27,7 +27,7 @@ class DateColumnMissing(Exception):
         self._column_name = column_name
 
 
-class IgnoredColumnMissing(Exception):
+class TextColumnMissing(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
         super().__init__(
             f"un-shifted {column_name=} is missing from the cdm {page_name=}"
@@ -461,6 +461,11 @@ def shift_excel_dates_inplace(
         for i, val in enumerate(header_values, start=1):
             if val is not None and str(val).strip():
                 col_index[str(val).strip()] = i
+
+            if (val not in config["date_columns"]) and (
+                val not in config["text_columns"]
+            ):
+                raise ExtraColumn(sheet_name, val)
 
         if sheet_patient_id_col not in col_index:
             raise ValueError(
