@@ -440,8 +440,7 @@ def shift_excel_dates_inplace(
 
     for sheet_name, config in sheet_configs.items():
         if sheet_name not in wb.sheetnames:
-            logger.warning("Sheet '%s' not found in workbook, skipping", sheet_name)
-            continue
+            raise PageMissing(sheet_name)
 
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
