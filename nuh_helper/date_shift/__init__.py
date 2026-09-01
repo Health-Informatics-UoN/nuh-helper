@@ -20,6 +20,13 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class HiddenDate(Exception):
+    def __init__(self, sheet_name: str, row: int, col: int, value: str) -> None:
+        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=}"
+        super().__init__(message)
+        self._message = message
+
+
 def _get_patient_ids_and_shift_mappings(
     input_file: str,
     patient_sheet: str,
