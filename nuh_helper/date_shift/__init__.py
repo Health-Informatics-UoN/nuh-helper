@@ -513,6 +513,14 @@ def shift_excel_dates_inplace(
                 else:
                     cell.value = cast(Any, shifted.to_pydatetime())
 
+            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
+                if non_date_col_idx in date_col_indices.values():
+                    continue
+
+                cell = ws.cell(row=row_idx, column=non_date_col_idx)
+
+                print(f"{sheet_name=} [{row_idx}, {non_date_col_idx}] {cell.value=}")
+
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)
 
