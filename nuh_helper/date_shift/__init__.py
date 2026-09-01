@@ -21,8 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class HiddenDate(Exception):
-    def __init__(self, sheet_name: str, row: int, col: int, value: str) -> None:
-        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=}"
+    def __init__(
+        self, sheet_name: str, row: int, col: int, value: str, found: datetime
+    ) -> None:
+        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
         super().__init__(message)
         self._message = message
 
@@ -513,13 +515,18 @@ def shift_excel_dates_inplace(
                 else:
                     cell.value = cast(Any, shifted.to_pydatetime())
 
+            # check for dates in non-date columns
             for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
                 if non_date_col_idx in date_col_indices.values():
                     continue
 
-                cell = ws.cell(row=row_idx, column=non_date_col_idx)
+                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
+                import datefinder
 
-                print(f"{sheet_name=} [{row_idx}, {non_date_col_idx}] {cell.value=}")
+                for found in datefinder.find_dates(value):
+                    raise HiddenDate(
+                        sheet_name, row_idx, non_date_col_idx, value, found
+                    )
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)

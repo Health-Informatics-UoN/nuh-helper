@@ -39,7 +39,11 @@ def test_iso8601(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == "foobar"
+    assert info.value._message == (
+        "hidden date in [sheet_name='args', 4, 3]"
+        + " value='hives on 2023-10-12'"
+        + " // found=datetime.datetime(2023, 10, 12, 0, 0)"
+    )
 
 
 def test_us_date(tmp_path: Path) -> None:
@@ -73,7 +77,11 @@ def test_us_date(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == "foobar"
+    assert info.value._message == (
+        "hidden date in [sheet_name='data', 6, 3]"
+        + ' value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
+        + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
+    )
 
 
 def test_written(tmp_path: Path) -> None:
@@ -107,4 +115,8 @@ def test_written(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == "foobar"
+    assert info.value._message == (
+        "hidden date in [sheet_name='yeah', 5, 3]"
+        + " value='flu on mar 21st, 2009'"
+        + " // found=datetime.datetime(2009, 3, 21, 0, 0)"
+    )
