@@ -20,9 +20,36 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class UnknownPatient(Exception):
+    def __init__(self, page: str, id: str) -> None:
+        message = f"Unknown {id=} on {page=}"
+        super().__init__(message)
+        self._message = message
+
+
+# >> pr 125 Exception goes here
 class ShiftFoundNonDate(Exception):
     def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
         super().__init__(f"{page=}[{row}, {col} @ {col_name=}] {val=}")
+
+
+# << end of pr 125
+
+# >> pr 127 Exception goes here
+# << end of pr 127
+
+# >> pr 128 Exception goes here
+# << end of pr 128
+
+# >> pr 129 Exception goes here
+# << end of pr 129
+
+# >> pr 130 Exception goes here
+# << end of pr 130
+
+
+# >> pr 131 Exception goes here
+# << end of pr 131
 
 
 def _get_patient_ids_and_shift_mappings(
@@ -488,7 +515,14 @@ def shift_excel_dates_inplace(
 
             pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
             pid = _parse._normalize_patient_id(pid_cell.value)
-            shift_days = shift_dict.get(pid) if pid is not None else None
+
+            if pid is None:
+                # skip rows with no person id
+                continue
+
+            shift_days = shift_dict.get(pid)
+            if shift_days is None:
+                raise UnknownPatient(sheet_name, pid)
 
             for col_name, date_col_idx in date_col_indices.items():
                 cell = ws.cell(row=row_idx, column=date_col_idx)
@@ -551,4 +585,5 @@ __all__ = [
     "shift_excel_dates",
     "shift_excel_dates_inplace",
     "ShiftFoundNonDate",
+    UnknownPatient,
 ]
