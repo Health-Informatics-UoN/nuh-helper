@@ -25,6 +25,9 @@ class HiddenDate(Exception):
         self, sheet_name: str, row: int, col: int, value: str, found: datetime
     ) -> None:
         message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
+class UnknownPatient(Exception):
+    def __init__(self, page: str, id: str) -> None:
+        message = f"Unknown {id=} on {page=}"
         super().__init__(message)
         self._message = message
 
@@ -486,7 +489,14 @@ def shift_excel_dates_inplace(
 
             pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
             pid = _parse._normalize_patient_id(pid_cell.value)
-            shift_days = shift_dict.get(pid) if pid is not None else None
+
+            if pid is None:
+                # skip rows with no person id
+                continue
+
+            shift_days = shift_dict.get(pid)
+            if shift_days is None:
+                raise UnknownPatient(sheet_name, pid)
 
             for col_name, date_col_idx in date_col_indices.items():
                 cell = ws.cell(row=row_idx, column=date_col_idx)
@@ -498,9 +508,6 @@ def shift_excel_dates_inplace(
                         original_value, datetime | date
                     ):
                         cell.value = None
-                    continue
-
-                if shift_days is None:
                     continue
 
                 exc_dates = parsed_exceptions.get(col_name, set())
@@ -548,4 +555,5 @@ __all__ = [
     "apply_date_shifts",
     "generate_shift_mappings",
     "load_shift_mappings",
+    UnknownPatient,
 ]
