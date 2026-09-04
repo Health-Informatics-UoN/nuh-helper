@@ -43,7 +43,6 @@ class UnknownPatient(Exception):
 # << end of pr 130
 
 
-# >> pr 131 Exception goes here
 class DateTooFarBack(Exception):
     def __init__(self, value: pd.Timestamp) -> None:
         message = f"the date {value} is too far in the past"
@@ -56,9 +55,6 @@ class DateTooFarAhead(Exception):
         message = f"the date {value} is too far in the future"
         super().__init__(message)
         self._message = message
-
-
-# << end of pr 131
 
 
 def _get_patient_ids_and_shift_mappings(
