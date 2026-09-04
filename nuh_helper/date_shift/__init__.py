@@ -27,6 +27,26 @@ class UnknownPatient(Exception):
         self._message = message
 
 
+# >> pr 125 Exception goes here
+# << end of pr 125
+
+# >> pr 127 Exception goes here
+# << end of pr 127
+
+# >> pr 128 Exception goes here
+# << end of pr 128
+
+# >> pr 129 Exception goes here
+# << end of pr 129
+
+# >> pr 130 Exception goes here
+# << end of pr 130
+
+
+# >> pr 131 Exception goes here
+# << end of pr 131
+
+
 def _get_patient_ids_and_shift_mappings(
     input_file: str,
     patient_sheet: str,
@@ -343,6 +363,7 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
+    clamp_date: date | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -371,6 +392,9 @@ def shift_excel_dates_inplace(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional zero-based row indices to exclude from patient data.
+        clamp_date:
+          optional "maximum date value" for shifted date columns. dates in un
+          shifted columns aren't changed.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
@@ -510,12 +534,15 @@ def shift_excel_dates_inplace(
                     continue
 
                 shifted = parsed + pd.Timedelta(days=shift_days)
+                shifted_datetime = shifted.to_pydatetime()
+                if clamp_date is not None and clamp_date < shifted_datetime:
+                    shifted_datetime = clamp_date
                 if isinstance(original_value, date) and not isinstance(
                     original_value, datetime
                 ):
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.value = cast(Any, shifted_datetime.date())
                 else:
-                    cell.value = cast(Any, shifted.to_pydatetime())
+                    cell.value = cast(Any, shifted_datetime)
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)

@@ -123,6 +123,14 @@ shift_excel_dates_inplace(
 
 The function accepts the same parameters as `shift_excel_dates` except `date_format` (not needed — the original cell format is preserved). External links and named ranges are removed from the output to avoid Excel repair dialogs.
 
+### "Clamping" the Study End Date
+
+A further feature of `shift_excel_dates_inplace()` allows supplying a "clamp date" to control shifted date values.
+At least one previous study collected data which included dates after the study end date.
+The procedure for this study tasked the data technician to change all dates back to the study end date.
+Setting `clamp_date=???` when invoking `shift_excel_dates_inplace()` will clamp all shifted dates in the same manner removing the need for human effort.
+The approach will not change any dates which are not being shifted - even if they extend past this value - with the assumption being that non-shifted dates are not study data.
+
 ### Key parameters (date shifting)
 
 - `input_file`: Path to input Excel file
@@ -142,6 +150,7 @@ The function accepts the same parameters as `shift_excel_dates` except `date_for
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
 - `date_format`: (Optional, `shift_excel_dates` only) Excel date format string (e.g., ‘YYYY-MM-DD’)
+- `clamp_date`: (Optional) All shifted dates will be clamped to this value as the latest. During previous studies there had been a requirement that any dates be updated so that none were after the study end date. Doing this during date shifting alleviates the need to search the final `.xslx` sheet for dates. Unshifted dates, presumably things like CDM version history, are not changed.
 
 ### Excel layout (header row and merged cells)
 
