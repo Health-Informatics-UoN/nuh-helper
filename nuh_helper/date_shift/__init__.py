@@ -40,7 +40,6 @@ class UnknownPatient(Exception):
 # << end of pr 129
 
 
-# >> pr 130 Exception goes here
 class HiddenDate(Exception):
     def __init__(
         self, sheet_name: str, row: int, col: int, value: str, found: datetime
@@ -48,9 +47,6 @@ class HiddenDate(Exception):
         message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
         super().__init__(message)
         self._message = message
-
-
-# << end of pr 130
 
 
 # >> pr 131 Exception goes here
