@@ -203,7 +203,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.6.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.16.2" },
+    { name = "ruff", specifier = ">=0.16.4" },
     { name = "ty", specifier = ">=0.0.65" },
     { name = "types-openpyxl", specifier = ">=3.1.5.20260807" },
 ]
