@@ -186,6 +186,7 @@ def generate_scan_report(
 
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
+        logger.info(f"scan_csv_values() for {table_name_indexed=}")
         value_data, row_count, type_info = scan_csv_values(
             table["path"], min_cell_count
         )
@@ -194,12 +195,14 @@ def generate_scan_report(
         table_row_counts[table_name_indexed] = row_count
 
     # FIELD_OVERVIEW
+    logger.info("FIELD_OVERVIEW")
     field_sheet = wb.create_sheet("Field Overview")
     field_sheet.append(FIELD_OVERVIEW_HEADERS)
 
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
         type_info = table_type_info[table_name_indexed]
+        logger.info(f"FIELD_OVERVIEW {table_name_indexed=}")
         for field in table["fields"]:
             info = type_info.get(field)
             field_type = info.type if info else "EMPTY"
@@ -210,21 +213,25 @@ def generate_scan_report(
         field_sheet.append([""])
 
     # TABLE_OVERVIEW
+    logger.info("TABLE_OVERVIEW")
     table_sheet = wb.create_sheet("Table Overview")
     table_sheet.append(TABLE_OVERVIEW_HEADERS)
 
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
         row_count = table_row_counts[table_name_indexed]
+        logger.info(f"TABLE_OVERVIEW {table_name_indexed=} {row_count=}")
 
         table_sheet.append(
             [table_name_indexed, "", row_count, row_count, len(table["fields"]), -1]
         )
 
     # VALUE SHEETS
+    logger.info("VALUE SHEETS")
     for table in tables:
         table_name_indexed = indexed_names[table["name"]]
         value_sheet = wb.create_sheet(table_name_indexed)
+        logger.info(f"VALUE SHEETS {table_name_indexed=}")
 
         fields = table["fields"]
         value_data = table_value_data[table_name_indexed]
