@@ -56,22 +56,24 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
     assert worksheet.cell(2, 1).value == "pid"
     assert worksheet.cell(3, 1).value == "nuh71"
     assert worksheet.cell(4, 1).value == "nuh06"
-    assert worksheet.cell(5, 1).value == "nuh67"
-    assert worksheet.cell(6, 1).value == "nuh27"
+    assert worksheet.cell(5, 1).value == "nuh23"
+    assert worksheet.cell(6, 1).value == "nuh67"
+    assert worksheet.cell(7, 1).value == "nuh27"
 
     # last column
     assert worksheet.cell(1, 3).value == "pizza topping"
     assert worksheet.cell(2, 3).value == "top"
     assert worksheet.cell(3, 3).value == "cheese"
     assert worksheet.cell(4, 3).value == "unknown"
-    assert str(worksheet.cell(5, 3).value) == "2016-09-17 00:00:00"
-    assert worksheet.cell(6, 3).value == "2016-07-18 idk"
+    assert worksheet.cell(5, 3).value == "mushrooms"
+    assert str(worksheet.cell(6, 3).value) == "2016-09-17 00:00:00"
+    assert worksheet.cell(7, 3).value == "2016-07-18 idk"
 
     # the important column to check - the dates
     assert worksheet.cell(1, 2).value == "birthday"
     assert worksheet.cell(2, 2).value == "dob"
-
     assert str(worksheet.cell(3, 2).value) == "2001-12-17 00:00:00"
     assert str(worksheet.cell(4, 2).value) == "1993-09-20 00:00:00"
-    assert str(worksheet.cell(5, 2).value) == "mssing"  # change that's under test
-    assert str(worksheet.cell(6, 2).value) == "1999-11-30 00:00:00"
+    assert worksheet.cell(5, 2).value is None
+    assert str(worksheet.cell(6, 2).value) == "mssing"  # change that's under test
+    assert str(worksheet.cell(7, 2).value) == "1999-11-30 00:00:00"
