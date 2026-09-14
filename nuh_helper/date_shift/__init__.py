@@ -20,42 +20,92 @@ from nuh_helper.date_shift import _excel, _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class UnknownPatient(Exception):
+    def __init__(self, page: str, id: str) -> None:
+        message = f"Unknown {id=} on {page=}"
+        super().__init__(message)
+        self._message = message
+
+
+# >> pr 125 Exception goes here
+class ShiftFoundNonDate(Exception):
+    def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
+        message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
+        super().__init__(message)
+        self._message = message
+
+
+# << end of pr 125
+
+# >> pr 127 Exception goes here
+# << end of pr 127
+
+# >> pr 128 Exception goes here
+# << end of pr 128
+
+# >> pr 129 Exception goes here
+# << end of pr 129
+
+
+class HiddenDate(Exception):
+    def __init__(
+        self, sheet_name: str, row: int, col: int, value: str, found: datetime
+    ) -> None:
+        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
+        super().__init__(message)
+        self._message = message
+
+
+# >> pr 131 Exception goes here
+# << end of pr 131
+
+
 class DateColumnMissing(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
-        super().__init__(f"date {column_name=} is missing from the cdm {page_name=}")
+        message = f"date {column_name=} is missing from the cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
         self._page_name = page_name
         self._column_name = column_name
 
 
 class TextColumnMissing(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
-        super().__init__(
-            f"un-shifted {column_name=} is missing from the cdm {page_name=}"
-        )
+        message = f"un-shifted {column_name=} is missing from the cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
         self._page_name = page_name
         self._column_name = column_name
 
 
 class ExtraColumn(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
-        super().__init__(
+        message = (
             f"{column_name=} is neither ignored or shifted in the cdm {page_name=}"
         )
+        super().__init__(message)
+        self._message = message
+
         self._page_name = page_name
         self._column_name = column_name
 
 
 class PageMissing(Exception):
     def __init__(self, page_name: str) -> None:
-        super().__init__(
-            f"an expected page was missing from the source cdm {page_name=}"
-        )
+        message = f"an expected page was missing from the source cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
         self._page_name = page_name
 
 
 class ExtraPage(Exception):
     def __init__(self, page_name: str) -> None:
-        super().__init__(f"an unexpected page was found in the source cdm {page_name=}")
+        message = f"an unexpected page was found in the source cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
         self._page_name = page_name
 
 
@@ -224,7 +274,7 @@ def apply_date_shifts(
         # Convert back to date-only format (removes time component)
         df[date_col] = df[date_col].apply(
             lambda x: (
-                x.date() if isinstance(x, (pd.Timestamp | datetime | date)) else None
+                x.date() if isinstance(x, pd.Timestamp | datetime | date) else None
             ),
         )
 
@@ -388,17 +438,23 @@ def shift_excel_dates_inplace(
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
         patient_id_col: Name of the column containing patient IDs in the patient sheet.
-        sheet_configs:Dictionary mapping sheet names to configuration dicts,
+        sheet_configs:
+          Dictionary mapping sheet names to configuration dicts,
                         or, the string 'skip' if that sheet should be
                         skipped but is a valid part of the CDM.
-                      Each config dict should have:
-                      - 'patient_id_col': Name of patient ID column in that sheet
-                      - 'date_columns': List of date column names to shift
+          Each config dict should have:
+          - 'patient_id_col': Name of patient ID column in that sheet
+          - 'date_columns': List of date column names to shift
                       - 'text_columns': List of non-date columns to ignore
-                      Optional per-sheet header handling:
-                      - 'header_row': zero-based row index of the column names (default 0)
-                      - 'skip_rows_after_header': list of zero-based row indices to exclude
-                        from data (e.g. a data-type row immediately below the header)
+          Optional per-sheet header handling:
+          - 'header_row': zero-based row index of the column names (default 0)
+          - 'skip_rows_after_header': list of zero-based row indices to
+            exclude from data (e.g. a data-type row immediately below the
+            header)
+          - pass_as_is: a map of {column name: [value list]} of non-date
+            strings allowed in date cells. these are passed through
+            unchanged. blank entries, and, whitespace on the start/end of the
+            strings are always allowed.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
@@ -532,19 +588,41 @@ def shift_excel_dates_inplace(
 
             pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
             pid = _parse._normalize_patient_id(pid_cell.value)
-            shift_days = shift_dict.get(pid) if pid is not None else None
+
+            if pid is None:
+                # skip rows with no person id
+                continue
+
+            shift_days = shift_dict.get(pid)
+            if shift_days is None:
+                raise UnknownPatient(sheet_name, pid)
 
             for col_name, date_col_idx in date_col_indices.items():
                 cell = ws.cell(row=row_idx, column=date_col_idx)
                 original_value = cell.value
-                parsed = _parse._parse_date_value(original_value)
 
-                if parsed is None:
-                    if original_value is not None and not isinstance(
-                        original_value, datetime | date
-                    ):
-                        cell.value = None
+                # skip blank values
+                if str(original_value).strip() == "":
                     continue
+
+                # block non-dates in date columns
+                if not isinstance(original_value, datetime | date):
+                    # check if it's one of the non-dates allowed
+                    page_config = sheet_configs[sheet_name]
+                    pass_as_is = page_config.get("pass_as_is", {})
+                    allowed_non_dates = pass_as_is.get(col_name, [])
+                    if (original_value is None) or (
+                        original_value.strip() in allowed_non_dates
+                    ):
+                        continue
+
+                    raise ShiftFoundNonDate(
+                        sheet_name, row_idx, date_col_idx, col_name, original_value
+                    )
+
+                # original_value is datetime | date
+                # ... so parsed should always succeed
+                parsed = _parse._parse_date_value(original_value)
 
                 if shift_days is None:
                     continue
@@ -561,6 +639,19 @@ def shift_excel_dates_inplace(
                 else:
                     cell.value = cast(Any, shifted.to_pydatetime())
 
+            # check for dates in non-date columns
+            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
+                if non_date_col_idx in date_col_indices.values():
+                    continue
+
+                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
+                import datefinder
+
+                for found in datefinder.find_dates(value):
+                    raise HiddenDate(
+                        sheet_name, row_idx, non_date_col_idx, value, found
+                    )
+
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)
 
@@ -576,9 +667,7 @@ from nuh_helper.date_shift.mappings import (  # noqa: E402
 )
 
 __all__ = [
-    "shift_excel_dates",
-    "shift_excel_dates_inplace",
-    "apply_date_shifts",
-    "generate_shift_mappings",
-    "load_shift_mappings",
+    generate_shift_mappings,
+    load_shift_mappings,
+    shift_excel_dates_inplace,
 ]
