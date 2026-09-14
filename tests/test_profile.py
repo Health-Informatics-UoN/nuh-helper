@@ -83,6 +83,7 @@ def test_has_bom(
     remove_bom: None | bool,
     tmp_path: Path,
 ) -> None:
+    """tests the profile call with things to control wether it's removed or not"""
 
     # this one won't have a BOM
     csv_path = tmp_path / "patients.csv"
