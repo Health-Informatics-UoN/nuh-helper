@@ -8,6 +8,10 @@ from nuh_helper.date_shift import (
 )
 
 
+def test_hidden_in_patient_id() -> None:
+    pytest.fail("implement this test")
+
+
 def test_iso8601(tmp_path: Path) -> None:
 
     source_file = Path(__file__).parent / "data/hidden_dates/iso8601.xlsx"
@@ -20,6 +24,9 @@ def test_iso8601(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
+            ],
+            "text_columns": [
+                "diagnosis",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],

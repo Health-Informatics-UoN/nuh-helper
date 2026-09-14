@@ -513,6 +513,8 @@ def shift_excel_dates_inplace(
         assert isinstance(config, dict)
         assert "text_columns" in config
         assert "date_columns" in config
+        assert config["patient_id_col"] not in config["date_columns"]
+        assert config["patient_id_col"] not in config["text_columns"]
 
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
@@ -533,12 +535,14 @@ def shift_excel_dates_inplace(
             if val is not None and str(val).strip():
                 col_index[str(val).strip()] = i
 
-            if (val not in config["date_columns"]) and (
-                val not in config["text_columns"]
+            if (
+                (val not in config["date_columns"])
+                and (val not in config["text_columns"])
+                and (val != config["patient_id_col"])
             ):
                 raise ExtraColumn(sheet_name, val)
 
-        for text_column in config["text_columns"]:
+        for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
                 raise TextColumnMissing(sheet_name, text_column)
 
