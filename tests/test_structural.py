@@ -28,7 +28,6 @@ def test_date_column_missing(tmp_path: Path) -> None:
             ],
             "text_columns": [
                 "food",
-                # "a-missing-text-column",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
@@ -65,12 +64,8 @@ def test_extra_column(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
-                # "a-missing-date-column",
             ],
-            "text_columns": [
-                # "food",
-                # "a-missing-text-column",
-            ],
+            "text_columns": [],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
@@ -106,7 +101,6 @@ def test_text_column_missing(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
-                # "a-missing-date-column",
             ],
             "text_columns": [
                 "food",
@@ -146,11 +140,9 @@ def test_page_missing(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
-                # "a-missing-date-column",
             ],
             "text_columns": [
                 "food",
-                # "a-missing-text-column",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
@@ -160,12 +152,10 @@ def test_page_missing(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
-                # "a-missing-date-column",
             ],
             "text_columns": [
                 "ptid",
                 "food",
-                # "a-missing-text-column",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
@@ -201,30 +191,13 @@ def test_page_extra(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
-                # "a-missing-date-column",
             ],
             "text_columns": [
                 "food",
-                # "a-missing-text-column",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
-        # "stuff": 'skip',
-        # "a-missing-page": {
-        #     "patient_id_col": "ptid",
-        #     "date_columns": [
-        #         "dob",
-        #         # "a-missing-date-column",
-        #     ],
-        #     "text_columns": [
-        #         "ptid",
-        #         "food",
-        #         # "a-missing-text-column",
-        #     ],
-        #     "header_row": 0,
-        #     "skip_rows_after_header": [],
-        # },
     }
     with pytest.raises(ExtraPage) as info:
         shift_excel_dates_inplace(
