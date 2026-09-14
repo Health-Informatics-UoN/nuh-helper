@@ -510,6 +510,10 @@ def shift_excel_dates_inplace(
             # it's a skipped sheet
             continue
 
+        assert isinstance(config, dict)
+        assert "text_columns" in config
+        assert "date_columns" in config
+
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
         date_columns: list[str] = cast(list[str], config["date_columns"])
