@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from openpyxl import load_workbook
 
 from nuh_helper.profile import FieldTypeInfo, generate_scan_report
@@ -75,3 +76,57 @@ class TestGenerateScanReport:
             "dob": "DATE",
             "name": "VARCHAR",
         }
+
+
+@pytest.mark.parametrize("remove_bom", [True, False, None])
+def test_has_bom(
+    remove_bom: None | bool,
+    tmp_path: Path,
+) -> None:
+
+    # this one won't have a BOM
+    csv_path = tmp_path / "patients.csv"
+    csv_path.write_text(
+        "patient_id,age,measurement,dob,name\n"
+        "P001,45,120,2020-01-15,Alice\n"
+        "P002,50,130,2020-02-16,Bob\n"
+        "P003,60,110,2020-03-17,Carol\n"
+    )
+
+    if remove_bom is None:
+        output_path = generate_scan_report(
+            [
+                str(csv_path),
+                # this one does have a BOM which ends up in the final
+                str(Path(__file__).parent / "data/passed/offsets.csv"),
+            ],
+            output_path=str(tmp_path / "report-1.xlsx"),
+        )
+    else:
+        output_path = generate_scan_report(
+            [
+                str(csv_path),
+                # this one does have a BOM which ends up in the final
+                str(Path(__file__).parent / "data/passed/offsets.csv"),
+            ],
+            output_path=str(tmp_path / "report-1.xlsx"),
+            remove_bom=remove_bom,
+        )
+
+    book = load_workbook(output_path)
+
+    for name in book.sheetnames:
+        if not name.endswith(".csv"):
+            continue
+        assert name == "offsets.csv" or name == "patients.csv"
+
+        page = book[name]
+
+        if name == "patients.csv":
+            assert str(page.cell(row=1, column=1).value)[0] == "p"
+
+        if name == "offsets.csv":
+            if remove_bom is None or remove_bom:
+                assert str(page.cell(row=1, column=1).value)[0] == "p"
+            else:
+                assert str(page.cell(row=1, column=1).value)[0] == "\ufeff"

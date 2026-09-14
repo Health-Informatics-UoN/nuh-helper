@@ -160,6 +160,7 @@ def generate_scan_report(
     csv_files: list[str],
     output_path: str = SCAN_REPORT_FILE_NAME,
     min_cell_count: int = 1,
+    remove_bom: bool = True,
 ) -> str:
     logger.info("Generating scan report for %d table(s)", len(csv_files))
 
