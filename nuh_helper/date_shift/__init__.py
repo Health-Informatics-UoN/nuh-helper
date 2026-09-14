@@ -54,6 +54,11 @@ class HiddenDate(Exception):
         message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
         super().__init__(message)
         self._message = message
+        self._sheet_name = sheet_name
+        self._row = row
+        self._col = col
+        self._value = value
+        self._found = found
 
 
 # >> pr 131 Exception goes here
