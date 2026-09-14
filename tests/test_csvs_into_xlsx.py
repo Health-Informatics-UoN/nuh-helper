@@ -1,9 +1,15 @@
+import csv
 from pathlib import Path
 
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from nuh_helper.csv_xlsx import append_page, csvs_into_xlsx, overwrite_page
+from nuh_helper.csv_xlsx import (
+    append_page,
+    csvs_from_xlsx,
+    csvs_into_xlsx,
+    overwrite_page,
+)
 
 
 class ExcelCellMismatch(Exception):
@@ -181,3 +187,24 @@ def test_combine(tmp_path: Path) -> None:
     csvs_into_xlsx(result, data)
 
     assert_xlsx_same(data / "combined.xlsx", result)
+
+
+def test_extract(tmp_path: Path) -> None:
+    data = Path(__file__).parent / "data/csvs_into_xlsx"
+
+    csvs_from_xlsx(data / "combined.xlsx", tmp_path)
+
+    # check if there is an expected file for each obtained one
+    for obtained in tmp_path.glob("*.csv"):
+        assert (data / obtained.name).is_file()
+
+    # check it the other way and also check contents
+    for expected_path in data.glob("*.csv"):
+        obtained_path = tmp_path / expected_path.name
+        assert obtained_path.is_file()
+        with expected_path.open() as file:
+            expected_data = list(csv.reader(file))
+        with obtained_path.open() as file:
+            obtained_data = list(csv.reader(file))
+
+        assert expected_data == obtained_data
