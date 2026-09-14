@@ -511,16 +511,23 @@ def shift_excel_dates_inplace(
             continue
 
         assert isinstance(config, dict)
-        assert "text_columns" in config
-        assert "date_columns" in config
-        assert config["patient_id_col"] not in config["date_columns"]
-        assert config["patient_id_col"] not in config["text_columns"]
+
+        assert "text_columns" in config, f"no text_columns setting for {sheet_name=}"
+        assert "date_columns" in config, f"no date_columns setting for {sheet_name=}"
 
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
         date_columns: list[str] = cast(list[str], config["date_columns"])
+        text_columns: list[str] = cast(list[str], config["text_columns"])
         header_row: int = cast(int, config.get("header_row", 0))
         skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
+
+        assert sheet_patient_id_col not in date_columns, (
+            f"{sheet_patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
+        )
+        assert sheet_patient_id_col not in text_columns, (
+            f"{sheet_patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
+        )
 
         max_col = ws.max_column or 0
         if not max_col:

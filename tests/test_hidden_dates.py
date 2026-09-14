@@ -66,6 +66,9 @@ def test_us_date(tmp_path: Path) -> None:
             "date_columns": [
                 "dob",
             ],
+            "text_columns": [
+                "diagnosis",
+            ],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
@@ -103,6 +106,9 @@ def test_written(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
+            ],
+            "text_columns": [
+                "diagnosis",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],

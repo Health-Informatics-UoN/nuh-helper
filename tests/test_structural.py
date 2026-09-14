@@ -27,7 +27,6 @@ def test_date_column_missing(tmp_path: Path) -> None:
                 "a-missing-date-column",
             ],
             "text_columns": [
-                "ptid",
                 "food",
                 # "a-missing-text-column",
             ],
@@ -69,7 +68,6 @@ def test_extra_column(tmp_path: Path) -> None:
                 # "a-missing-date-column",
             ],
             "text_columns": [
-                "ptid",
                 # "food",
                 # "a-missing-text-column",
             ],
@@ -111,7 +109,6 @@ def test_text_column_missing(tmp_path: Path) -> None:
                 # "a-missing-date-column",
             ],
             "text_columns": [
-                "ptid",
                 "food",
                 "a-missing-text-column",
             ],
@@ -152,7 +149,6 @@ def test_page_missing(tmp_path: Path) -> None:
                 # "a-missing-date-column",
             ],
             "text_columns": [
-                "ptid",
                 "food",
                 # "a-missing-text-column",
             ],
@@ -208,7 +204,6 @@ def test_page_extra(tmp_path: Path) -> None:
                 # "a-missing-date-column",
             ],
             "text_columns": [
-                "ptid",
                 "food",
                 # "a-missing-text-column",
             ],
