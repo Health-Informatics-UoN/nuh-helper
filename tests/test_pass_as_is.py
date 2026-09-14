@@ -66,8 +66,8 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
     assert worksheet.cell(3, 3).value == "cheese"
     assert worksheet.cell(4, 3).value == "unknown"
     assert worksheet.cell(5, 3).value == "mushrooms"
-    assert str(worksheet.cell(6, 3).value) == "2016-09-17 00:00:00"
-    assert worksheet.cell(7, 3).value == "2016-07-18 idk"
+    assert worksheet.cell(6, 3).value == "this can't be a date - sorry 2016"
+    assert worksheet.cell(7, 3).value == "idk - this can't be a date anymore"
 
     # the important column to check - the dates
     assert worksheet.cell(1, 2).value == "birthday"
