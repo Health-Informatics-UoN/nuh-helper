@@ -44,8 +44,14 @@ class ShiftFoundNonDate(Exception):
 # >> pr 129 Exception goes here
 # << end of pr 129
 
-# >> pr 130 Exception goes here
-# << end of pr 130
+
+class HiddenDate(Exception):
+    def __init__(
+        self, sheet_name: str, row: int, col: int, value: str, found: datetime
+    ) -> None:
+        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
+        super().__init__(message)
+        self._message = message
 
 
 # >> pr 131 Exception goes here
@@ -565,6 +571,19 @@ def shift_excel_dates_inplace(
                     cell.value = cast(Any, shifted.to_pydatetime().date())
                 else:
                     cell.value = cast(Any, shifted.to_pydatetime())
+
+            # check for dates in non-date columns
+            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
+                if non_date_col_idx in date_col_indices.values():
+                    continue
+
+                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
+                import datefinder
+
+                for found in datefinder.find_dates(value):
+                    raise HiddenDate(
+                        sheet_name, row_idx, non_date_col_idx, value, found
+                    )
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)

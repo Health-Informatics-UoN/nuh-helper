@@ -8,6 +8,7 @@ requires-python = ">=3.13"
 dependencies = [
     "pandas>=3.0.5",
     "openpyxl>=3.1.0",
+    "datefinder>=1.0.0",
 ]
 
 [build-system]
