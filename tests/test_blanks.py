@@ -18,6 +18,7 @@ def test_missing_ids(tmp_path: Path) -> None:
         "sheet": {
             "patient_id_col": "pitd",
             "date_columns": ["dob"],
+            "text_columns": ["postcode"],
             "header_row": 0,
             "skip_rows_after_header": [],
         }
@@ -54,6 +55,7 @@ def test_valid(tmp_path: Path) -> None:
         "sheet": {
             "patient_id_col": "pitd",
             "date_columns": ["dob"],
+            "text_columns": ["postcode"],
             "header_row": 0,
             "skip_rows_after_header": [],
         }

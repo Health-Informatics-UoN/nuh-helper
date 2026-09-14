@@ -16,12 +16,14 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
+        "page-desc": "skip",
         "page-data": {
             "patient_id_col": "pid",
             "date_columns": ["dob"],
+            "text_columns": ["top"],
             "header_row": 1,
             "skip_rows_after_header": [],
-        }
+        },
     }
 
     def body() -> None:
