@@ -23,5 +23,5 @@ tests/output/
 
 .DS_Store
 
-# ignore temp excel files (maybe)
-~$*.xlsx
+# ignore temp excel files
+~*

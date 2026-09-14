@@ -30,7 +30,9 @@ class UnknownPatient(Exception):
 # >> pr 125 Exception goes here
 class ShiftFoundNonDate(Exception):
     def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
-        super().__init__(f"{page=}[{row}, {col} @ {col_name=}] {val=}")
+        message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
+        super().__init__(message)
+        self._message = message
 
 
 # << end of pr 125
@@ -52,10 +54,64 @@ class HiddenDate(Exception):
         message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
         super().__init__(message)
         self._message = message
+        self._sheet_name = sheet_name
+        self._row = row
+        self._col = col
+        self._value = value
+        self._found = found
 
 
 # >> pr 131 Exception goes here
 # << end of pr 131
+
+
+class DateColumnMissing(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = f"date {column_name=} is missing from the cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class TextColumnMissing(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = f"un-shifted {column_name=} is missing from the cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class ExtraColumn(Exception):
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = (
+            f"{column_name=} is neither ignored or shifted in the cdm {page_name=}"
+        )
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class PageMissing(Exception):
+    def __init__(self, page_name: str) -> None:
+        message = f"an expected page was missing from the source cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+
+
+class ExtraPage(Exception):
+    def __init__(self, page_name: str) -> None:
+        message = f"an unexpected page was found in the source cdm {page_name=}"
+        super().__init__(message)
+        self._message = message
+        self._page_name = page_name
 
 
 def _get_patient_ids_and_shift_mappings(
@@ -388,10 +444,13 @@ def shift_excel_dates_inplace(
         patient_sheet: Name of the sheet containing patient IDs.
         patient_id_col: Name of the column containing patient IDs in the patient sheet.
         sheet_configs:
-          Dictionary mapping sheet names to configuration dicts.
+          Dictionary mapping sheet names to configuration dicts, or, the string
+            'skip' if that sheet should be skipped but is a valid part of the
+            CDM.
           Each config dict should have:
           - 'patient_id_col': Name of patient ID column in that sheet
           - 'date_columns': List of date column names to shift
+          - 'text_columns': List of non-date columns to ignore
           Optional per-sheet header handling:
           - 'header_row': zero-based row index of the column names (default 0)
           - 'skip_rows_after_header': list of zero-based row indices to
@@ -443,16 +502,37 @@ def shift_excel_dates_inplace(
     wb = load_workbook(output_file, keep_links=False)
     wb.defined_names.clear()
 
+    # check for sheets we didn't have an explanation for
+    for sheet_name in wb.sheetnames:
+        if sheet_name not in sheet_configs:
+            raise ExtraPage(sheet_name)
+
     for sheet_name, config in sheet_configs.items():
         if sheet_name not in wb.sheetnames:
-            logger.warning("Sheet '%s' not found in workbook, skipping", sheet_name)
+            raise PageMissing(sheet_name)
+
+        if isinstance(config, str) and config == "skip":
+            # it's a skipped sheet
             continue
+
+        assert isinstance(config, dict)
+
+        assert "text_columns" in config, f"no text_columns setting for {sheet_name=}"
+        assert "date_columns" in config, f"no date_columns setting for {sheet_name=}"
 
         ws = cast(Worksheet, wb[sheet_name])
         sheet_patient_id_col: str = cast(str, config["patient_id_col"])
         date_columns: list[str] = cast(list[str], config["date_columns"])
+        text_columns: list[str] = cast(list[str], config["text_columns"])
         header_row: int = cast(int, config.get("header_row", 0))
         skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
+
+        assert sheet_patient_id_col not in date_columns, (
+            f"{sheet_patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
+        )
+        assert sheet_patient_id_col not in text_columns, (
+            f"{sheet_patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
+        )
 
         max_col = ws.max_column or 0
         if not max_col:
@@ -467,6 +547,17 @@ def shift_excel_dates_inplace(
             if val is not None and str(val).strip():
                 col_index[str(val).strip()] = i
 
+            if (
+                (val not in config["date_columns"])
+                and (val not in config["text_columns"])
+                and (val != config["patient_id_col"])
+            ):
+                raise ExtraColumn(sheet_name, val)
+
+        for text_column in [config["patient_id_col"]] + config["text_columns"]:
+            if text_column not in header_values:
+                raise TextColumnMissing(sheet_name, text_column)
+
         if sheet_patient_id_col not in col_index:
             raise ValueError(
                 f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"  # noqa: E501
@@ -478,11 +569,7 @@ def shift_excel_dates_inplace(
             if col in col_index:
                 date_col_indices[col] = col_index[col]
             else:
-                logger.warning(
-                    "Date column '%s' not found in sheet '%s', skipping",
-                    col,
-                    sheet_name,
-                )
+                raise DateColumnMissing(sheet_name, col)
 
         if not date_col_indices:
             continue
