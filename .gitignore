@@ -12,6 +12,7 @@ wheels/
 
 # Output files
 *.csv
+*.xlsx
 tests/output/
 *.jsonl
 *.jsonl.gz
@@ -21,3 +22,6 @@ tests/output/
 *.jsonl.tar.gz
 
 .DS_Store
+
+# ignore temp excel files (maybe)
+~$*.xlsx
