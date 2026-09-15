@@ -85,6 +85,17 @@ class TextColumnMissing(Exception):
         self._column_name = column_name
 
 
+class BlankColumnHasData(Exception):
+    def __init__(self, page: str, row: int, col: int, value: any) -> None:
+        message = f"[{page=} @ {row}, {col}] is a blank column with data {value=}"
+        super().__init__(message)
+        self._message = message
+        self._page: str = page
+        self._row: int = row
+        self._col: int = col
+        self._value: any = value
+
+
 class ExtraColumn(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
         message = (
@@ -430,6 +441,7 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
+    clamp_date: date | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -467,6 +479,9 @@ def shift_excel_dates_inplace(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional zero-based row indices to exclude from patient data.
+        clamp_date:
+          optional "maximum date value" for shifted date columns. dates in un
+          shifted columns aren't changed.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
@@ -551,8 +566,29 @@ def shift_excel_dates_inplace(
                 (val not in config["date_columns"])
                 and (val not in config["text_columns"])
                 and (val != config["patient_id_col"])
+                and (val is not None)
             ):
-                raise ExtraColumn(sheet_name, val)
+                raise ExtraColumn(
+                    page_name=sheet_name,
+                    column_name=val,
+                )
+
+            # loop through the values in that column to be sure they're all empty
+            if val is None:
+                for row in range(ws.max_row):
+                    row += 1
+
+                    value = ws.cell(row, i).value
+
+                    # blank is good
+                    if value is None:
+                        continue
+
+                    # empty strings are also fine
+                    if str(value).strip() == "":
+                        continue
+
+                    raise BlankColumnHasData(sheet_name, row, i, value)
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
@@ -652,12 +688,28 @@ def shift_excel_dates_inplace(
                     continue
 
                 shifted = parsed + pd.Timedelta(days=shift_days)
+                shifted_datetime = shifted.to_pydatetime()
+                if clamp_date is not None and clamp_date < shifted_datetime:
+                    shifted_datetime = clamp_date
                 if isinstance(original_value, date) and not isinstance(
                     original_value, datetime
                 ):
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.value = cast(Any, shifted_datetime.date())
                 else:
-                    cell.value = cast(Any, shifted.to_pydatetime())
+                    cell.value = cast(Any, shifted_datetime)
+
+            # check for dates in non-date columns
+            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
+                if non_date_col_idx in date_col_indices.values():
+                    continue
+
+                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
+                import datefinder
+
+                for found in datefinder.find_dates(value):
+                    raise HiddenDate(
+                        sheet_name, row_idx, non_date_col_idx, value, found
+                    )
 
             # check for dates in non-date columns
             for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
