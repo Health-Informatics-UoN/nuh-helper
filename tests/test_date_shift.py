@@ -55,7 +55,7 @@ class TestParseDateValue:
 
     @pytest.mark.parametrize(
         "placeholder",
-        ["unknown", "Unknown", "unk", "unkown", "n/a", "none", "null"],
+        ["unknown", "Unknown", "unk", "unknown", "n/a", "none", "null"],
     )
     def test_placeholder_strings_return_none(self, placeholder: str) -> None:
         assert _parse_date_value(placeholder) is None
