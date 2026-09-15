@@ -85,6 +85,17 @@ class TextColumnMissing(Exception):
         self._column_name = column_name
 
 
+class BlankColumnHasData(Exception):
+    def __init__(self, page: str, row: int, col: int, value: any) -> None:
+        message = f"[{page=} @ {row}, {col}] is a blank column with data {value=}"
+        super().__init__(message)
+        self._message = message
+        self._page: str = page
+        self._row: int = row
+        self._col: int = col
+        self._value: any = value
+
+
 class ExtraColumn(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
         message = (
