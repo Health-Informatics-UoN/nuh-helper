@@ -556,7 +556,10 @@ def shift_excel_dates_inplace(
                 and (val not in config["text_columns"])
                 and (val != config["patient_id_col"])
             ):
-                raise ExtraColumn(sheet_name, val)
+                raise ExtraColumn(
+                    page_name=sheet_name,
+                    column_name=val,
+                )
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:

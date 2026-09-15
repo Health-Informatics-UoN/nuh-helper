@@ -23,12 +23,14 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
         "people": {
             "patient_id_col": "ptid",
             "date_columns": ["dob"],
+            "text_columns": ["something else"],
             "header_row": 1,
             "skip_rows_after_header": [],
         },
         "events": {
             "patient_id_col": "patient",
             "date_columns": ["date"],
+            "text_columns": ["pill"],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
