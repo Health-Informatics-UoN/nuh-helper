@@ -19,6 +19,7 @@ def test_too_far_ahead(tmp_path: Path) -> None:
     sheet_configs = {
         "tofarr": {
             "patient_id_col": "patient",
+            "text_columns": [],
             "date_columns": [
                 "dobirth",
             ],
@@ -55,6 +56,7 @@ def test_too_far_back(tmp_path: Path) -> None:
     sheet_configs = {
         "Sheet1": {
             "patient_id_col": "patient",
+            "text_columns": [],
             "date_columns": [
                 "dob",
             ],
