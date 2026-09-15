@@ -9,11 +9,13 @@ from nuh_helper.date_shift import UnknownPatient
 def test_missing_id(tmp_path: Path) -> None:
 
     sheet_configs = {
+        "description": "skip",
         "patients": {
             "patient_id_col": "ptid",
             "header_row": 1,
             "skip_rows_after_header": [2],
             "date_columns": ["dob"],
+            "text_columns": ["pc"],
         },
         "deceased": {
             "patient_id_col": "patient_id",
@@ -23,6 +25,7 @@ def test_missing_id(tmp_path: Path) -> None:
                 "deaddat",
                 "diagdat",
             ],
+            "text_columns": [],
         },
     }
 
