@@ -562,6 +562,7 @@ def shift_excel_dates_inplace(
                 (val not in config["date_columns"])
                 and (val not in config["text_columns"])
                 and (val != config["patient_id_col"])
+                and (val is not None)
             ):
                 raise ExtraColumn(sheet_name, val)
 
