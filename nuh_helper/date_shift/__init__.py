@@ -85,6 +85,17 @@ class TextColumnMissing(Exception):
         self._column_name = column_name
 
 
+class BlankColumnHasData(Exception):
+    def __init__(self, page: str, row: int, col: int, value: any) -> None:
+        message = f"[{page=} @ {row}, {col}] is a blank column with data {value=}"
+        super().__init__(message)
+        self._message = message
+        self._page: str = page
+        self._row: int = row
+        self._col: int = col
+        self._value: any = value
+
+
 class ExtraColumn(Exception):
     def __init__(self, page_name: str, column_name: str) -> None:
         message = (
@@ -551,8 +562,26 @@ def shift_excel_dates_inplace(
                 (val not in config["date_columns"])
                 and (val not in config["text_columns"])
                 and (val != config["patient_id_col"])
+                and (val is not None)
             ):
                 raise ExtraColumn(sheet_name, val)
+
+            # loop through the values in that column to be sure they're all empty
+            if val is None:
+                for row in range(ws.max_row):
+                    row += 1
+
+                    value = ws.cell(row, i).value
+
+                    # blank is good
+                    if value is None:
+                        continue
+
+                    # empty strings are also fine
+                    if str(value).strip() == "":
+                        continue
+
+                    raise BlankColumnHasData(sheet_name, row, i, value)
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
