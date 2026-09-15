@@ -566,6 +566,23 @@ def shift_excel_dates_inplace(
             ):
                 raise ExtraColumn(sheet_name, val)
 
+            # loop through the values in that column to be sure they're all empty
+            if val is None:
+                for row in range(ws.max_row):
+                    row += 1
+
+                    value = ws.cell(row, i).value
+
+                    # blank is good
+                    if value is None:
+                        continue
+
+                    # empty strings are also fine
+                    if str(value).strip() == "":
+                        continue
+
+                    raise BlankColumnHasData(sheet_name, row, i, value)
+
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
                 raise TextColumnMissing(sheet_name, text_column)
