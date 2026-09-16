@@ -443,6 +443,7 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
+    clamp_date: date | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -480,6 +481,9 @@ def shift_excel_dates_inplace(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional zero-based row indices to exclude from patient data.
+        clamp_date:
+          optional "maximum date value" for shifted date columns. dates in un
+          shifted columns aren't changed.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
@@ -691,12 +695,28 @@ def shift_excel_dates_inplace(
                     continue
 
                 shifted = parsed + pd.Timedelta(days=shift_days)
+                shifted_datetime = shifted.to_pydatetime()
+                if clamp_date is not None and clamp_date < shifted_datetime:
+                    shifted_datetime = clamp_date
                 if isinstance(original_value, date) and not isinstance(
                     original_value, datetime
                 ):
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.value = cast(Any, shifted_datetime.date())
                 else:
-                    cell.value = cast(Any, shifted.to_pydatetime())
+                    cell.value = cast(Any, shifted_datetime)
+
+            # check for dates in non-date columns
+            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
+                if non_date_col_idx in date_col_indices.values():
+                    continue
+
+                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
+                import datefinder
+
+                for found in datefinder.find_dates(value):
+                    raise HiddenDate(
+                        sheet_name, row_idx, non_date_col_idx, value, found
+                    )
 
             # check for dates in non-date columns
             for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
