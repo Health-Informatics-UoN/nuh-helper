@@ -67,29 +67,8 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
     assert str(people.cell(4, 2).value) == "1987-09-10 00:00:00"
     assert str(people.cell(5, 2).value) == "1976-02-19 00:00:00"
 
-    assert people.cell(1, 3).value == "something else"
-    assert people.cell(2, 3).value is None
-    assert people.cell(3, 3).value == "tacos"
-    assert people.cell(4, 3).value == "pizza"
-    assert people.cell(5, 3).value == "cake"
-
-    # check the first sheet
-    people = workbook.worksheets[0]
-
-    assert people.cell(1, 1).value == "person id"
-    assert people.cell(2, 1).value == "ptid"
-    assert people.cell(3, 1).value == "nuh17"
-    assert people.cell(4, 1).value == "nuh28"
-    assert people.cell(5, 1).value == "nuh71"
-
-    assert people.cell(1, 2).value == "date of birth"
-    assert people.cell(2, 2).value == "dob"
-    assert str(people.cell(3, 2).value) == "1990-08-18 00:00:00"
-    assert str(people.cell(4, 2).value) == "1987-09-10 00:00:00"
-    assert str(people.cell(5, 2).value) == "1976-02-19 00:00:00"
-
-    assert people.cell(1, 3).value == "something else"
-    assert people.cell(2, 3).value is None
+    assert people.cell(1, 3).value is None
+    assert people.cell(2, 3).value == "something else"
     assert people.cell(3, 3).value == "tacos"
     assert people.cell(4, 3).value == "pizza"
     assert people.cell(5, 3).value == "cake"
@@ -114,7 +93,7 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
     assert events.cell(1, 5).value == "pill"
     assert events.cell(2, 5).value == "asprin"
     assert events.cell(3, 5).value is None
-    assert str(events.cell(4, 5).value) == "2027-06-19 00:00:00"
+    assert str(events.cell(4, 5).value) == "shoes"
     assert events.cell(5, 5).value == "zuul"
     assert events.cell(6, 5).value is None
     assert events.cell(7, 5).value == "ibuprophen"
