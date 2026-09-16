@@ -27,7 +27,6 @@ class UnknownPatient(Exception):
         self._message = message
 
 
-# >> pr 125 Exception goes here
 class ShiftFoundNonDate(Exception):
     def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
         message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
@@ -35,16 +34,11 @@ class ShiftFoundNonDate(Exception):
         self._message = message
 
 
-# << end of pr 125
-
 # >> pr 127 Exception goes here
 # << end of pr 127
 
 # >> pr 128 Exception goes here
 # << end of pr 128
-
-# >> pr 129 Exception goes here
-# << end of pr 129
 
 
 class HiddenDate(Exception):
@@ -86,6 +80,10 @@ class TextColumnMissing(Exception):
 
 
 class BlankColumnHasData(Exception):
+    """raised when a column with a blank name has data.
+
+    prevents data being hidden in the wrong part of the CDM"""
+
     def __init__(self, page: str, row: int, col: int, value: any) -> None:
         message = f"[{page=} @ {row}, {col}] is a blank column with data {value=}"
         super().__init__(message)
@@ -97,6 +95,10 @@ class BlankColumnHasData(Exception):
 
 
 class ExtraColumn(Exception):
+    """raised when an unknown column appears in a page we're shifting.
+
+    could mean a column is named wrong, or, that the sheet_config is incomplete"""
+
     def __init__(self, page_name: str, column_name: str) -> None:
         message = (
             f"{column_name=} is neither ignored or shifted in the cdm {page_name=}"
@@ -556,11 +558,11 @@ def shift_excel_dates_inplace(
         col_indexes: dict[str, int] = {}
         for col_index, col_name in enumerate(header_values, start=1):
             # simplify the column name
-            if col_name is not None:
-                col_name = str(col_name).strip()
+            col_name = str(col_name).strip() if col_name is not None else ""
 
-            # loop through the values in that column to be sure they're all empty
-            if col_name is None or col_name == "":
+            if col_name == "":
+                # there's no column name - the column should be blank
+                # loop through the values in that column to be sure they're all empty
                 # check each row
                 for row in range(ws.max_row):
                     row += 1
@@ -577,20 +579,19 @@ def shift_excel_dates_inplace(
 
                     # raise an error
                     raise BlankColumnHasData(sheet_name, row, col_index, value)
-                # we're done with blank-named columns
-                continue
 
-            assert col_name is not None
-            assert col_name != ""
+                # we don't do more work on blank columns
 
-            col_indexes[col_name] = col_index
-
-            if (
+            elif (
+                # check the config to see if we know what to do with this column
                 (col_name not in config["date_columns"])
                 and (col_name not in config["text_columns"])
                 and (col_name != config["patient_id_col"])
             ):
                 raise ExtraColumn(sheet_name, col_name)
+            else:
+                # happy normal column
+                col_indexes[col_name] = col_index
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
