@@ -11,7 +11,7 @@ from nuh_helper.date_shift import (
     apply_date_shifts,
     generate_shift_mappings,
     load_shift_mappings,
-    shift_excel_dates,
+    shift_excel_dates_inplace,
 )
 from nuh_helper.date_shift._excel import (
     _description_merged_ranges,
@@ -260,11 +260,15 @@ class TestShiftExcelDatesWithComplexLayout:
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["date_result"],
+                "text_columns": [
+                    "type",
+                    "measurement",
+                ],
                 "header_row": 2,
                 "skip_rows_after_header": [3],
             },
         }
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
@@ -291,6 +295,10 @@ class TestShiftExcelDatesWithComplexLayout:
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["date_result"],
+                "text_columns": [
+                    "measurement",
+                    "type",
+                ],
                 "header_row": 2,
                 "skip_rows_after_header": [3],
             },
@@ -299,7 +307,7 @@ class TestShiftExcelDatesWithComplexLayout:
          Do not pass patient_header_row; patient sheet "patients"
          is in config with header_row=2
          """
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
@@ -514,10 +522,11 @@ class TestShiftExcelDatesExceptionsIntegration:
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["last_alive"],
+                "text_columns": [],
                 "shift_exceptions": {"last_alive": ["2024-12-31"]},
             }
         }
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
