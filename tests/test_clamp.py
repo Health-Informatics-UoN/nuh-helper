@@ -91,12 +91,12 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
 
     # column 5 is not dates so "easy"
     assert events.cell(1, 5).value == "pill"
-    assert events.cell(2, 5).value == "asprin"
+    assert events.cell(2, 5).value == "asprin"  # spelling mistake is intentional
     assert events.cell(3, 5).value is None
-    assert str(events.cell(4, 5).value) == "shoes"
+    assert events.cell(4, 5).value == "shoes"
     assert events.cell(5, 5).value == "zuul"
     assert events.cell(6, 5).value is None
-    assert events.cell(7, 5).value == "ibuprophen"
+    assert events.cell(7, 5).value == "ibuprophen"  # spelling mistake is intentional
 
     # column 3 will have the clamped dates
     assert events.cell(1, 3).value == "date"
