@@ -553,25 +553,19 @@ def shift_excel_dates_inplace(
         header_values = _excel._get_row_values_resolving_merged(
             ws, header_row_1based, max_col
         )
-        col_index: dict[str, int] = {}
-        for i, val in enumerate(header_values, start=1):
-            if val is not None and str(val).strip():
-                col_index[str(val).strip()] = i
-
-            if (
-                (val not in config["date_columns"])
-                and (val not in config["text_columns"])
-                and (val != config["patient_id_col"])
-                and (val is not None)
-            ):
-                raise ExtraColumn(sheet_name, val)
+        col_indexes: dict[str, int] = {}
+        for col_index, col_name in enumerate(header_values, start=1):
+            # simplify the column name
+            if col_name is not None:
+                col_name = str(col_name).strip()
 
             # loop through the values in that column to be sure they're all empty
-            if val is None:
+            if col_name is None or col_name == "":
+                # check each row
                 for row in range(ws.max_row):
                     row += 1
 
-                    value = ws.cell(row, i).value
+                    value = ws.cell(row, col_index).value
 
                     # blank is good
                     if value is None:
@@ -581,22 +575,37 @@ def shift_excel_dates_inplace(
                     if str(value).strip() == "":
                         continue
 
-                    raise BlankColumnHasData(sheet_name, row, i, value)
+                    # raise an error
+                    raise BlankColumnHasData(sheet_name, row, col_index, value)
+                # we're done with blank-named columns
+                continue
+
+            assert col_name is not None
+            assert col_name != ""
+
+            col_indexes[col_name] = col_index
+
+            if (
+                (col_name not in config["date_columns"])
+                and (col_name not in config["text_columns"])
+                and (col_name != config["patient_id_col"])
+            ):
+                raise ExtraColumn(sheet_name, col_name)
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
                 raise TextColumnMissing(sheet_name, text_column)
 
-        if sheet_patient_id_col not in col_index:
+        if sheet_patient_id_col not in col_indexes:
             raise ValueError(
                 f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"  # noqa: E501
             )
 
-        pid_col_idx = col_index[sheet_patient_id_col]
+        pid_col_idx = col_indexes[sheet_patient_id_col]
         date_col_indices: dict[str, int] = {}
         for col in date_columns:
-            if col in col_index:
-                date_col_indices[col] = col_index[col]
+            if col in col_indexes:
+                date_col_indices[col] = col_indexes[col]
             else:
                 raise DateColumnMissing(sheet_name, col)
 
