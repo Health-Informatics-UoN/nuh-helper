@@ -683,9 +683,6 @@ def shift_excel_dates_inplace(
                 # ... so parsed should always succeed
                 parsed = _parse._parse_date_value(original_value)
 
-                if shift_days is None:
-                    continue
-
                 exc_dates = parsed_exceptions.get(col_name, set())
                 if exc_dates and parsed.date() in exc_dates:
                     continue
