@@ -457,8 +457,8 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
-    sanity_date_latest: datetime | pd.Timestamp | None = None,
-    sanity_date_earliest: datetime | pd.Timestamp | None = None,
+    sanity_date_latest: datetime | str | pd.Timestamp | None = None,
+    sanity_date_earliest: datetime | str | pd.Timestamp | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -506,7 +506,8 @@ def shift_excel_dates_inplace(
         sanity_date_latest = pd.Timestamp(sanity_date_latest)
 
     if sanity_date_earliest is None:
-        sanity_date_earliest = datetime(1900, 1, 1)
+        sanity_date_earliest = "1900-01-01"
+
     if not isinstance(sanity_date_earliest, pd.Timestamp):
         sanity_date_earliest = pd.Timestamp(sanity_date_earliest)
 
