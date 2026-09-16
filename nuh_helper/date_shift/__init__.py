@@ -54,16 +54,11 @@ class RowMissingID(Exception):
         self._value = value
 
 
-# << end of pr 125
-
 # >> pr 127 Exception goes here
 # << end of pr 127
 
 # >> pr 128 Exception goes here
 # << end of pr 128
-
-# >> pr 129 Exception goes here
-# << end of pr 129
 
 
 class HiddenDate(Exception):
@@ -104,7 +99,26 @@ class TextColumnMissing(Exception):
         self._column_name = column_name
 
 
+class BlankColumnHasData(Exception):
+    """raised when a column with a blank name has data.
+
+    prevents data being hidden in the wrong part of the CDM"""
+
+    def __init__(self, page: str, row: int, col: int, value: any) -> None:
+        message = f"[{page=} @ {row}, {col}] is a blank column with data {value=}"
+        super().__init__(message)
+        self._message = message
+        self._page: str = page
+        self._row: int = row
+        self._col: int = col
+        self._value: any = value
+
+
 class ExtraColumn(Exception):
+    """raised when an unknown column appears in a page we're shifting.
+
+    could mean a column is named wrong, or, that the sheet_config is incomplete"""
+
     def __init__(self, page_name: str, column_name: str) -> None:
         message = (
             f"{column_name=} is neither ignored or shifted in the cdm {page_name=}"
@@ -561,32 +575,58 @@ def shift_excel_dates_inplace(
         header_values = _excel._get_row_values_resolving_merged(
             ws, header_row_1based, max_col
         )
-        col_index: dict[str, int] = {}
-        for i, val in enumerate(header_values, start=1):
-            if val is not None and str(val).strip():
-                col_index[str(val).strip()] = i
+        col_indexes: dict[str, int] = {}
+        for col_index, col_name in enumerate(header_values, start=1):
+            # simplify the column name
+            col_name = str(col_name).strip() if col_name is not None else ""
 
-            if (
-                (val not in config["date_columns"])
-                and (val not in config["text_columns"])
-                and (val != config["patient_id_col"])
+            if col_name == "":
+                # there's no column name - the column should be blank
+                # loop through the values in that column to be sure they're all empty
+                # check each row
+                for row in range(ws.max_row):
+                    row += 1
+
+                    value = ws.cell(row, col_index).value
+
+                    # blank is good
+                    if value is None:
+                        continue
+
+                    # empty strings are also fine
+                    if str(value).strip() == "":
+                        continue
+
+                    # raise an error
+                    raise BlankColumnHasData(sheet_name, row, col_index, value)
+
+                # we don't do more work on blank columns
+
+            elif (
+                # check the config to see if we know what to do with this column
+                (col_name not in config["date_columns"])
+                and (col_name not in config["text_columns"])
+                and (col_name != config["patient_id_col"])
             ):
-                raise ExtraColumn(sheet_name, val)
+                raise ExtraColumn(sheet_name, col_name)
+            else:
+                # happy normal column
+                col_indexes[col_name] = col_index
 
         for text_column in [config["patient_id_col"]] + config["text_columns"]:
             if text_column not in header_values:
                 raise TextColumnMissing(sheet_name, text_column)
 
-        if sheet_patient_id_col not in col_index:
+        if sheet_patient_id_col not in col_indexes:
             raise ValueError(
                 f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"  # noqa: E501
             )
 
-        pid_col_idx = col_index[sheet_patient_id_col]
+        pid_col_idx = col_indexes[sheet_patient_id_col]
         date_col_indices: dict[str, int] = {}
         for col in date_columns:
-            if col in col_index:
-                date_col_indices[col] = col_index[col]
+            if col in col_indexes:
+                date_col_indices[col] = col_indexes[col]
             else:
                 raise DateColumnMissing(sheet_name, col)
 
