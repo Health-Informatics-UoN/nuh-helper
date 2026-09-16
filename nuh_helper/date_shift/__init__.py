@@ -41,6 +41,20 @@ class ShiftFoundNonDate(Exception):
 # << end of pr 128
 
 
+class DateTooFarBack(Exception):
+    def __init__(self, value: pd.Timestamp) -> None:
+        message = f"the date {value} is too far in the past"
+        super().__init__(message)
+        self._message = message
+
+
+class DateTooFarAhead(Exception):
+    def __init__(self, value: pd.Timestamp) -> None:
+        message = f"the date {value} is too far in the future"
+        super().__init__(message)
+        self._message = message
+
+
 class HiddenDate(Exception):
     def __init__(
         self, sheet_name: str, row: int, col: int, value: str, found: datetime
@@ -443,6 +457,8 @@ def shift_excel_dates_inplace(
     seed: int | None = None,
     patient_header_row: int = 0,
     patient_skip_rows: list[int] | None = None,
+    sanity_date_latest: datetime | str | pd.Timestamp | None = None,
+    sanity_date_earliest: datetime | str | pd.Timestamp | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -480,7 +496,21 @@ def shift_excel_dates_inplace(
         seed: Optional random seed for generating shifts.
         patient_header_row: Zero-based header row index for the patient sheet (default: 0).
         patient_skip_rows: Optional zero-based row indices to exclude from patient data.
+        sanity_date_latest, sanity_date_earliest: latest and earliest dates allowed in the data. used as a sanity check
+
     """  # noqa: E501
+
+    if sanity_date_latest is None:
+        sanity_date_latest = datetime.now()
+    if not isinstance(sanity_date_latest, pd.Timestamp):
+        sanity_date_latest = pd.Timestamp(sanity_date_latest)
+
+    if sanity_date_earliest is None:
+        sanity_date_earliest = "1900-01-01"
+
+    if not isinstance(sanity_date_earliest, pd.Timestamp):
+        sanity_date_earliest = pd.Timestamp(sanity_date_earliest)
+
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
         "Shift range: %d to %d days, seed=%s",
@@ -682,6 +712,20 @@ def shift_excel_dates_inplace(
                 # original_value is datetime | date
                 # ... so parsed should always succeed
                 parsed = _parse._parse_date_value(original_value)
+
+                if parsed is None:
+                    if original_value is not None and not isinstance(
+                        original_value, datetime | date
+                    ):
+                        cell.value = None
+                    continue
+
+                # only check the dates we're shifting
+                # ... other branches handle non-dates and dates we're not shifting
+                if parsed <= sanity_date_earliest:
+                    raise DateTooFarBack(parsed)
+                if parsed >= sanity_date_latest:
+                    raise DateTooFarAhead(parsed)
 
                 if shift_days is None:
                     continue
