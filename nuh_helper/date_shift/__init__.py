@@ -27,11 +27,20 @@ class UnknownPatient(Exception):
         self._message = message
 
 
-class ShiftFoundNonDate(Exception):
-    def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
-        message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
+class FoundNonDateInDateColumn(Exception):
+    """raised when a non-date value is found in a date column
+
+    ... and - it's not a "passthrough" exceptional value"""
+
+    def __init__(self, page: str, row: int, col: int, head: str, value: str) -> None:
+        message = f"[{page=} / {head=} @ {row} {col}] {value=}"
         super().__init__(message)
         self._message = message
+        self._page = page
+        self._row = row
+        self._col = col
+        self._value = value
+        self._head = head
 
 
 # >> pr 127 Exception goes here
@@ -675,7 +684,7 @@ def shift_excel_dates_inplace(
                     ):
                         continue
 
-                    raise ShiftFoundNonDate(
+                    raise FoundNonDateInDateColumn(
                         sheet_name, row_idx, date_col_idx, col_name, original_value
                     )
 
