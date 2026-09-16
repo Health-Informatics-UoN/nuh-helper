@@ -25,6 +25,8 @@ class UnknownPatient(Exception):
         message = f"Unknown {id=} on {page=}"
         super().__init__(message)
         self._message = message
+        self._page = page
+        self._id = id
 
 
 class ShiftFoundNonDate(Exception):
@@ -32,6 +34,24 @@ class ShiftFoundNonDate(Exception):
         message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
         super().__init__(message)
         self._message = message
+        self._page = page
+        self._row = row
+        self._col = col
+        self._col_name = col_name
+        self._val = val
+
+
+class RowMissingID(Exception):
+    def __init__(
+        self, sheet_name: str, row_idx: int, col_index: int, value: str
+    ) -> None:
+        message = f"missing id for [{sheet_name=}, {row_idx}, {col_index}] = {value=}"
+        super().__init__(message)
+        self._message = message
+        self._sheet_name = sheet_name
+        self._row_idx = row_idx
+        self._col_index = col_index
+        self._value = value
 
 
 # >> pr 127 Exception goes here
@@ -648,10 +668,25 @@ def shift_excel_dates_inplace(
             pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
             pid = _parse._normalize_patient_id(pid_cell.value)
 
+            # if this is a "no patient id" row - check for blank columns, then, skip it
             if pid is None:
-                # skip rows with no person id
+                # if there's no PID check that all columns are blank
+                for blank_col_index in range(1, (1 + ws.max_column)):
+                    cell = ws.cell(row=row_idx, column=blank_col_index)
+                    original_value = cell.value
+                    if original_value is None or str(original_value).strip() == "":
+                        continue
+
+                    # there's data where there shouldn't be; raise an error
+                    raise RowMissingID(
+                        sheet_name, row_idx, blank_col_index, str(original_value)
+                    )
+
+                # all columns were blank for this row; skip it
                 continue
 
+            # check to see if there's a number of days to skip.
+            # ... because if there's no value for the pid - this is an unknown pid
             shift_days = shift_dict.get(pid)
             if shift_days is None:
                 raise UnknownPatient(sheet_name, pid)
