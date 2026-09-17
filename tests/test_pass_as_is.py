@@ -4,7 +4,7 @@ import pytest
 from openpyxl import load_workbook
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import ShiftFoundNonDate
+from nuh_helper.date_shift import FoundNonDateInDateColumn
 
 
 @pytest.mark.parametrize("allow_passthrough", [True, False])
@@ -41,9 +41,9 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
         )
 
     if not allow_passthrough:
-        with pytest.raises(ShiftFoundNonDate) as info:
+        with pytest.raises(FoundNonDateInDateColumn) as info:
             body()
-        assert str(info.value) == "page='page-data'[6, 2 @ col_name='dob'] val='mssing'"
+        assert str(info.value) == "[page='page-data' / head='dob' @ 6 2] value='mssing'"
         return
     else:
         sheet_configs["page-data"]["pass_as_is"] = {"dob": ["mssing"]}

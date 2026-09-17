@@ -13,68 +13,68 @@ Helper library for enabling data studies: utilities for study enablement such as
 - **`nuh_helper.date_shift`** — Date shifting for patient data in Excel/DataFrames (consistent shifts per patient ID, reproducible via linking tables).
 - **`nuh_helper.profile`** - Profile a dataset into a Scan Report
 
-## Usage
+## Usage; Date Shifting
 
 ### Date shifting (basic example)
 
 ```python
-from nuh_helper import shift_excel_dates
-# or: from nuh_helper.date_shift import shift_excel_dates
+from nuh_helper import shift_excel_dates_inplace
+
+
+    source_file = Path(__file__).parent / (
+        "data/structural.with-blank.xlsx" if good else "data/structural.bad-blank.xlsx"
+    )
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = tmp_path / "linking_table_old.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
 
 # Configure which sheets and columns to shift
 sheet_configs = {
-    "patients": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["dob", "date_of_diagnosis"],
-        "header_row": 1,  # Optional: zero-based row index for column names
+
+    # shift the dates in the "paige" sheet
+    "paige": {
+        # patient IDs are in the "ptid" column
+        "patient_id_col": "ptid",
+        "date_columns": [
+            # shift the dates in the DOB column
+            "dob",
+        ],
+        "text_columns": [
+            # the food column has no dates
+            "food",
+        ],
+        "header_row": 0, # Optional: zero-based row index for column names. defaults to 0
+        "skip_rows_after_header": [],
     },
-    "labs": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["test_date"],
-        "header_row": 1,
-    },
+
+    # ignore the "stuff" page
+    "stuff": "skip",
 }
 
+
 # Shift dates in the Excel file
-shift_excel_dates(
+shift_excel_dates_inplace(
+    # input / output files
     input_file="input.xlsx",
     output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
+
+    # columns used to compute a list of patients
+    patient_sheet="paige",
+    patient_id_col="ptid",
+
+
     sheet_configs=sheet_configs,
     min_shift_days=-15,  # Lower range
     max_shift_days=15,   # Upper range
     seed=42,             # For reproducibility
-    date_format="YYYY-MM-DD",
+
+    # optional - csv files saving how many days each patient was shifted
+    # ... do not distribute these
+    # ... and probably best to keep them somewhere
+    linking_table_path="linking_table_old.csv",
+    linking_table_output="linking_table_new.csv",
 )
 ```
-
-### Excluding fixed study dates with `shift_exceptions`
-
-Some columns contain a mix of patient-specific dates (which should be shifted) and fixed study-wide dates (e.g. an end-of-study date) that must remain unchanged. Use `shift_exceptions` in `sheet_configs` to list any date values that should never be shifted:
-
-```python
-sheet_configs = {
-    "patients": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["last_alive"],
-        "shift_exceptions": {
-            "last_alive": ["2024-12-31"],  # end-of-study date — never shift
-        },
-    },
-}
-
-shift_excel_dates(
-    input_file="input.xlsx",
-    output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
-    sheet_configs=sheet_configs,
-    seed=42,
-)
-```
-
-The exception date strings are parsed with the same flexible parser used for all date values (supports multiple formats and placeholder strings). Exceptions are matched against the parsed date, so `"2024-12-31"` and `"31-12-2024"` both match the same calendar date.
 
 ### Reproducible Shifts with Linking Table
 
@@ -82,52 +82,38 @@ To use the same shifts across multiple runs, save and reuse a linking table:
 
 ```python
 # First run: generate and save shifts
-shift_excel_dates(
-    input_file="input.xlsx",
-    output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
-    sheet_configs=sheet_configs,
-    linking_table_output="shift_mappings.csv",  # Save shifts
-    seed=42,
-)
-
-# Subsequent runs: reuse the same shifts
-shift_excel_dates(
-    input_file="new_input.xlsx",
-    output_file="new_output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
-    sheet_configs=sheet_configs,
-    linking_table_path="shift_mappings.csv",  # Reuse saved shifts
-)
-```
-
-### Preserving formatting with `shift_excel_dates_inplace`
-
-If your workbook has rich formatting (cell styles, column widths, conditional formatting, etc.) use `shift_excel_dates_inplace` instead. It copies the input file and modifies date cells directly via openpyxl, so all formatting is preserved exactly.
-
-```python
-from nuh_helper import shift_excel_dates_inplace
-
 shift_excel_dates_inplace(
     input_file="input.xlsx",
     output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
+    patient_sheet="paige",
+    patient_id_col="ptid",
     sheet_configs=sheet_configs,
-    seed=42,
-    linking_table_output="shift_mappings.csv",
+    min_shift_days=-15,  # Lower range
+    max_shift_days=15,   # Upper range
+    seed=42,             # For reproducibility
+
+    # optional - csv files saving how many days each patient was shifted
+    # ... do not distribute these
+    # ... and probably best to keep them somewhere specific
+    linking_table_output="linking_table_first.csv",
+)
+
+# Second run: reuse the same shifts
+shift_excel_dates_inplace(
+    input_file="input_final.xlsx",
+    output_file="output_second.xlsx",
+    patient_sheet="paige",
+    patient_id_col="ptid",
+    sheet_configs=sheet_configs,
+    min_shift_days=-15,  # Lower range
+    max_shift_days=15,   # Upper range
+    seed=42,             # For reproducibility
+
+    # write to a new file this time
+    linking_table_path="linking_table_first.csv",
+    linking_table_output="linking_table_second.csv",
 )
 ```
-
-The function accepts the same parameters as `shift_excel_dates` except;
-
-- `date_format`
-  - not needed — the original cell format is preserved
-- `"text_columns": [???],`
-  - a per-sheet list of columns that have text only and shouldn't have dates
-  - these need to be explicitly specified to prevent extra columns in the CDM
 
 ### Passing Non Dates (in `date_columns`)
 
@@ -174,20 +160,25 @@ While this does require repeated manual intervention ...
 - `patient_sheet`: Name of the sheet containing patient IDs
 - `patient_id_col`: Name of the column containing patient IDs
 - `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
-  - `patient_id_col`: Patient ID column name in that sheet
-  - `date_columns`: List of date column names to shift
-  - `text_columns`: List of non-date columns to ignore
-  - `header_row`: (Optional) Zero-based row index for the row that contains column names
-  - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
-  - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values.
-  - `pass_as_is`: (Optional) Dict mapping column names to lists of "non dates" that are passed through without being changed
-- `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead.
+
+- `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead. (... or is it?)
 - `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead.
+
 - `min_shift_days` / `max_shift_days`: Range of days to shift (default: -15 to 15)
 - `linking_table_path`: (Optional) Path to existing linking table CSV for reproducibility
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
-- `date_format`: (Optional, `shift_excel_dates` only) Excel date format string (e.g., ‘YYYY-MM-DD’)
+
+#### Sheet Configs Per-Page Options
+
+- `patient_id_col`: Patient ID column name in that sheet
+- `date_columns`: List of date column names to shift
+- `text_columns`:
+  - a per-sheet list of columns that have text only and shouldn't have dates
+  - these need to be explicitly specified to prevent extra columns in the CDM
+- `header_row`: (Optional) Zero-based row index for the row that contains column names
+- `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
+- `pass_as_is`: (Optional) Dict mapping column names to lists of "non dates" that are passed through without being changed
 
 ### Excel layout (header row and merged cells)
 
@@ -207,7 +198,7 @@ Sheets can have a non-standard layout: e.g. a merged title row, then a descripti
 - Supports flexible date parsing (handles various formats and placeholders like "Unknown")
 - Reproducible shifts via linking tables
 
-### Dataset Profile
+## Usage; Dataset Profile
 
 Profile a dataset and generate a Scan Report.
 
