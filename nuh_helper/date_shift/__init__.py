@@ -456,9 +456,9 @@ def shift_excel_dates_inplace(
     """
     Shift dates in an Excel file, preserving all cell formatting.
 
-    Unlike shift_excel_dates(), this function copies the input file and then
-    modifies date cells directly via openpyxl, so all formatting (cell styles,
-    merged cells, column widths, conditional formatting, etc.) is preserved.
+    This function copies the input file and then modifies date cells directly
+    via openpyxl, so all formatting (cell styles, merged cells, column widths,
+    conditional formatting, etc.) is preserved.
 
     Args:
         input_file: Path to input Excel file.

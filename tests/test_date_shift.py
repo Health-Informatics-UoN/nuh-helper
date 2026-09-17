@@ -279,9 +279,14 @@ class TestShiftExcelDatesWithComplexLayout:
         )
         df = pd.read_excel(str(out), sheet_name="patients", header=2)
         assert list(df.columns) == ["patient_id", "measurement", "date_result", "type"]
-        # Data should be 2 rows (P001, P002), not 3 (no "stupid" row)
-        assert len(df) == 2
-        assert list(df["patient_id"]) == ["P001", "P002"]
+        # Data should now be 3 rows (stupid, P001, P002)
+        # ... Pandas can see "stupid" but date shifting doesn't
+        assert (
+            # this should be 3 these days
+            # ... it used to be "2" because "skip_rows_after_header" removed the rows?
+            len(df) == 3
+        )
+        assert list(df["patient_id"]) == ["stupid", "P001", "P002"]
 
     def test_patient_sheet_uses_config_header_when_sheet_in_sheet_configs(
         self, tmp_path: Path
@@ -320,7 +325,11 @@ class TestShiftExcelDatesWithComplexLayout:
         df = pd.read_excel(str(out), sheet_name="patients", header=2)
         assert "patient_id" in df.columns
         assert "date_result" in df.columns
-        assert len(df) == 2
+        assert (
+            # this should be 3 these days
+            # ... it used to be "2" because "skip_rows_after_header" removed the rows?
+            len(df) == 3
+        )
 
 
 class TestApplyDateShifts:
