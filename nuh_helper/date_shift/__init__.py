@@ -673,8 +673,14 @@ def shift_excel_dates_inplace(
                 if str(original_value).strip() == "":
                     continue
 
+                # always try to parse it; not all cells auto-load as date
+                parsed = _parse._parse_date_value(original_value)
+
+                if isinstance(original_value, datetime | date):
+                    assert parsed is not None
+
                 # block non-dates in date columns
-                if not isinstance(original_value, datetime | date):
+                if parsed is None:
                     # check if it's one of the non-dates allowed
                     page_config = sheet_configs[sheet_name]
                     pass_as_is = page_config.get("pass_as_is", {})
@@ -687,10 +693,6 @@ def shift_excel_dates_inplace(
                     raise FoundNonDateInDateColumn(
                         sheet_name, row_idx, date_col_idx, col_name, original_value
                     )
-
-                # original_value is datetime | date
-                # ... so parsed should always succeed
-                parsed = _parse._parse_date_value(original_value)
 
                 exc_dates = parsed_exceptions.get(col_name, set())
                 if exc_dates and parsed.date() in exc_dates:
