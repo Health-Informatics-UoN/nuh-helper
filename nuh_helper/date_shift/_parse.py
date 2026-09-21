@@ -13,7 +13,7 @@ def _parse_date_value(
         return None
 
     # Already datetime-like
-    if isinstance(value, (pd.Timestamp, datetime, date)):
+    if isinstance(value, pd.Timestamp | datetime | date):
         result = pd.to_datetime(value, errors="coerce")
         return result if pd.notna(result) else None
 
