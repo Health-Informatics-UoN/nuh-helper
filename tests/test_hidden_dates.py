@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,9 @@ def test_iso8601(tmp_path: Path) -> None:
             "patient_id_col": "ptid",
             "date_columns": [
                 "dob",
+            ],
+            "text_columns": [
+                "diagnosis",
             ],
             "header_row": 0,
             "skip_rows_after_header": [],
@@ -59,6 +63,9 @@ def test_us_date(tmp_path: Path) -> None:
             "date_columns": [
                 "dob",
             ],
+            "text_columns": [
+                "diagnosis",
+            ],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
@@ -97,6 +104,9 @@ def test_written(tmp_path: Path) -> None:
             "date_columns": [
                 "dob",
             ],
+            "text_columns": [
+                "diagnosis",
+            ],
             "header_row": 0,
             "skip_rows_after_header": [],
         },
@@ -120,3 +130,44 @@ def test_written(tmp_path: Path) -> None:
         + " value='flu on mar 21st, 2009'"
         + " // found=datetime.datetime(2009, 3, 21, 0, 0)"
     )
+
+
+def test_hidden_in_patient_id(tmp_path: Path) -> None:
+
+    source_file = Path(__file__).parent / "data/hidden_dates/in-ptid.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = tmp_path / "linking_table_old.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "data": {
+            "patient_id_col": "ptid",
+            "date_columns": [
+                "dob",
+            ],
+            "text_columns": [
+                "diagnosis",
+            ],
+            "header_row": 0,
+            "skip_rows_after_header": [],
+        },
+    }
+    with pytest.raises(HiddenDate) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="data",
+            patient_id_col="ptid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+
+    assert info.value._sheet_name == "data"
+    assert info.value._row == 5
+    assert info.value._col == 1
+    assert info.value._value == "nuh012 12/11/2001"
+    assert info.value._found == datetime(2001, 12, 11)

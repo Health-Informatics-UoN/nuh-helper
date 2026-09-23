@@ -121,9 +121,15 @@ shift_excel_dates_inplace(
 )
 ```
 
-The function accepts the same parameters as `shift_excel_dates` except `date_format` (not needed — the original cell format is preserved). External links and named ranges are removed from the output to avoid Excel repair dialogs.
+The function accepts the same parameters as `shift_excel_dates` except;
 
-### Passing Non Dates
+- `date_format`
+  - not needed — the original cell format is preserved
+- `"text_columns": [???],`
+  - a per-sheet list of columns that have text only and shouldn't have dates
+  - these need to be explicitly specified to prevent extra columns in the CDM
+
+### Passing Non Dates (in `date_columns`)
 
 Studies frequently include data that's not parsable as a date in the date columns.
 Rarely is this a typo, it can be text like `Record missing` or `2007-09-UN` to signify that information is only partially available.
@@ -135,6 +141,9 @@ sheet_configs = {
     "page-data": {
         "patient_id_col": "pid",
         "date_columns": ["dob"],
+        "text_columns": [
+            "food",
+        ],
         "header_row": 1,
         "skip_rows_after_header": [],
         "pass_as_is": {  # the parameter is here
@@ -164,9 +173,10 @@ While this does require repeated manual intervention ...
 - `output_file`: Path to output Excel file with shifted dates
 - `patient_sheet`: Name of the sheet containing patient IDs
 - `patient_id_col`: Name of the column containing patient IDs
-- `sheet_configs`: Dictionary mapping sheet names to configuration dicts with:
+- `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
   - `patient_id_col`: Patient ID column name in that sheet
   - `date_columns`: List of date column names to shift
+  - `text_columns`: List of non-date columns to ignore
   - `header_row`: (Optional) Zero-based row index for the row that contains column names
   - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
   - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values.
