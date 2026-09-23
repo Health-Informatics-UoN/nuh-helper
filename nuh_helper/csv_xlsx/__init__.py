@@ -33,7 +33,12 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
         csv_name: str = csv_file.stem
 
         with csv_file.open() as file:
-            data = list(csv.reader(file.readlines()))
+            data = list(
+                csv.reader(
+                    file.readlines(),
+                    delimiter=("\t" if csv_file.name.endswith(".tsv") else ","),
+                )
+            )
 
         # write the data
         if first_page:
