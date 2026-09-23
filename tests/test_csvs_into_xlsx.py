@@ -208,3 +208,15 @@ def test_extract(tmp_path: Path) -> None:
             obtained_data = list(csv.reader(file))
 
         assert expected_data == obtained_data
+
+
+def test_tsv(tmp_path: Path) -> None:
+    data = Path(__file__).parent / "data/csvs_into_xlsx"
+
+    result = tmp_path / "output.xlsx"
+
+    csvs_into_xlsx(result, sorted(data.glob("*.tsv")))
+
+    print(f"output = ${result}")
+
+    assert_xlsx_same(data / "combined.xlsx", result)
