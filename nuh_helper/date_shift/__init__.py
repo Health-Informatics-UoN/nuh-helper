@@ -656,35 +656,28 @@ def shift_excel_dates_inplace(
             if shift_days is None:
                 raise UnknownPatient(sheet_name, pid)
 
+            sheet_pass_exceptions = sheet_configs[sheet_name].get("pass_as_is", {})
             for col_name, date_col_idx in date_col_indices.items():
+                col_pass_exceptions = sheet_pass_exceptions.get(col_name, [])
+
                 cell = ws.cell(row=row_idx, column=date_col_idx)
                 original_value = cell.value
 
-                # skip blank values
-                if str(original_value).strip() == "":
+                # skip blank values and allowed exceptions to the rules
+                if (
+                    (original_value is None)
+                    or str(original_value).strip() == ""
+                    or (str(original_value).strip() in col_pass_exceptions)
+                ):
                     continue
 
-                # block non-dates in date columns
-                if not isinstance(original_value, datetime | date):
-                    # check if it's one of the non-dates allowed
-                    page_config = sheet_configs[sheet_name]
-                    pass_as_is = page_config.get("pass_as_is", {})
-                    allowed_non_dates = pass_as_is.get(col_name, [])
-                    if (original_value is None) or (
-                        original_value.strip() in allowed_non_dates
-                    ):
-                        continue
+                parsed = _parse._parse_date_value(original_value)
 
+                # block non-dates in date columns
+                if parsed is None:
                     raise ShiftFoundNonDate(
                         sheet_name, row_idx, date_col_idx, col_name, original_value
                     )
-
-                # original_value is datetime | date
-                # ... so parsed should always succeed
-                parsed = _parse._parse_date_value(original_value)
-
-                if shift_days is None:
-                    continue
 
                 exc_dates = parsed_exceptions.get(col_name, set())
                 if exc_dates and parsed.date() in exc_dates:
