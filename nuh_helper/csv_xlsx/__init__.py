@@ -1,4 +1,5 @@
 import csv
+from collections.abc import Iterable as iterable
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
@@ -20,8 +21,9 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
 
     if isinstance(csvs, Path):
         csvs = sorted(csvs.glob("*.csv"))
-
     assert isinstance(csvs, list)
+
+    print(f"csvs_into_xlsx({xlsx.name}) csvs = " + (", ".join(csvs)))
 
     assert not xlsx.is_dir()
 
@@ -31,26 +33,25 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
     for csv_file in csvs:
         assert csv_file.is_file()
         csv_name: str = csv_file.stem
-
+        print(f"csvs_into_xlsx({xlsx.name}) {csv_name=} starting")
         with csv_file.open() as file:
-            data = list(
-                csv.reader(
-                    file.readlines(),
-                    delimiter=("\t" if csv_file.name.endswith(".tsv") else ","),
-                )
+            data = csv.reader(
+                file.readlines(),
+                delimiter=("\t" if csv_file.name.endswith(".tsv") else ","),
             )
-
-        # write the data
-        if first_page:
-            page: Worksheet = workbook.active
-            page.title = csv_name
-            overwrite_page(page, data)
-            first_page = False
-        else:
-            append_page(workbook, csv_name, data)
+            if first_page:
+                page: Worksheet = workbook.active
+                page.title = csv_name
+                overwrite_page(page, data)
+                first_page = False
+            else:
+                append_page(workbook, csv_name, data)
+        print(f"csvs_into_xlsx({xlsx.name}) {csv_name=} complete")
 
     assert not first_page
+    print(f"csvs_into_xlsx({xlsx.name}) saving ...")
     workbook.save(xlsx)
+    print(f"csvs_into_xlsx({xlsx.name}) ... saved")
 
 
 def csvs_from_xlsx(xlsx: Path, csvs: None | Path = None) -> None:
@@ -78,12 +79,12 @@ __all__ = [
 ]
 
 
-def append_page(wb: Workbook, sheet_name: str, sheet_data: list[list]) -> None:
+def append_page(wb: Workbook, sheet_name: str, sheet_data: iterable[list]) -> None:
     ws = wb.create_sheet(sheet_name)
     overwrite_page(ws, sheet_data)
 
 
-def overwrite_page(ws: Worksheet, sheet_data: list[list]) -> None:
+def overwrite_page(ws: Worksheet, sheet_data: iterable[list]) -> None:
     if ws.max_row > 0:
         ws.delete_rows(1, ws.max_row)
 
