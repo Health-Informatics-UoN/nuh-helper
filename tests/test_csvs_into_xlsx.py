@@ -202,10 +202,24 @@ def test_extract(tmp_path: Path) -> None:
     for expected_path in data.glob("*.csv"):
         obtained_path = tmp_path / expected_path.name
         assert obtained_path.is_file()
+
         with expected_path.open() as file:
             expected_data = list(csv.reader(file))
         with obtained_path.open() as file:
             obtained_data = list(csv.reader(file))
+
+        if expected_data != obtained_data:
+            raise Exception(
+                "\n\t".join(
+                    [
+                        "check the files",
+                        f"{obtained_path}",
+                        f"{obtained_path.stat().st_size=}",
+                        f"{expected_path}",
+                        f"{expected_path.stat().st_size=}",
+                    ]
+                )
+            )
 
         assert expected_data == obtained_data
 

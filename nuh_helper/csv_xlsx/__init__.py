@@ -67,17 +67,9 @@ def csvs_from_xlsx(xlsx: Path, csvs: None | Path = None) -> None:
 
     for name in book.sheetnames:
         with (csvs / f"{name}.csv").open("w") as file:
-            data = csv.writer(file)
+            data = csv.writer(file, lineterminator="\n")
             page = book[name]
-            data.writerows(
-                [
-                    [
-                        page.cell(row + 1, col + 1).value
-                        for col in range(page.max_column)
-                    ]
-                    for row in range(page.max_row)
-                ]
-            )
+            data.writerows([cell.value for cell in row] for row in page.rows)
 
 
 __all__ = [
