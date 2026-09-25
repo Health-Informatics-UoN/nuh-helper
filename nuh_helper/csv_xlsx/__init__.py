@@ -19,7 +19,7 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
         csvs = xlsx.parent
 
     if isinstance(csvs, Path):
-        csvs = list(csvs.glob("*.csv"))
+        csvs = sorted(csvs.glob("*.csv"))
 
     assert isinstance(csvs, list)
 
@@ -93,7 +93,8 @@ def append_page(wb: Workbook, sheet_name: str, sheet_data: list[list]) -> None:
 
 def overwrite_page(ws: Worksheet, sheet_data: list[list]) -> None:
     print(
-        "TODO; clear rows if ws.max_row > 0 : ws.delete_rows(1, max_row) // then ws.append(row) for row in sheet_data"
+        "TODO; clear rows if ws.max_row > 0 : ws.delete_rows(1, max_row) "
+        + "'// then ws.append(row) for row in sheet_data"
     )
     for row_idx, row_data in enumerate(sheet_data, start=1):
         for col_idx, cell_data in enumerate(row_data, start=1):
