@@ -23,7 +23,9 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
         csvs = sorted(csvs.glob("*.csv"))
     assert isinstance(csvs, list)
 
-    print(f"csvs_into_xlsx({xlsx.name}) csvs = " + (", ".join(csvs)))
+    print(
+        f"csvs_into_xlsx({xlsx.name}) csvs = " + (", ".join(csv.name for csv in csvs))
+    )
 
     assert not xlsx.is_dir()
 
