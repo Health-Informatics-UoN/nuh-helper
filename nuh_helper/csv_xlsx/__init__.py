@@ -1,6 +1,8 @@
 import csv
+from collections.abc import Generator as gen
 from collections.abc import Iterable as iterable
 from pathlib import Path
+from typing import TextIO
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -38,7 +40,7 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
         print(f"csvs_into_xlsx({xlsx.name}) {csv_name=} starting")
         with csv_file.open() as file:
             data = csv.reader(
-                file.readlines(),
+                iter_lines(file),
                 delimiter=("\t" if csv_file.name.endswith(".tsv") else ","),
             )
             if first_page:
@@ -54,6 +56,11 @@ def csvs_into_xlsx(xlsx: Path, csvs: None | Path | list[Path] = None) -> None:
     print(f"csvs_into_xlsx({xlsx.name}) saving ...")
     workbook.save(xlsx)
     print(f"csvs_into_xlsx({xlsx.name}) ... saved")
+
+
+def iter_lines(file: TextIO) -> gen[str]:
+    for line in file:
+        yield line.strip()
 
 
 def csvs_from_xlsx(xlsx: Path, csvs: None | Path = None) -> None:
