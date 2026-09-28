@@ -146,7 +146,7 @@ sheet_configs = {
         ],
         "header_row": 1,
         "skip_rows_after_header": [],
-        "pass_as_is": {  # the parameter is here
+        "shift_ignore": {  # the parameter is here
             "dob": [  # any column can have "as is" values added
                 "missing",  # the values are each listed here
             ]
@@ -180,7 +180,7 @@ While this does require repeated manual intervention ...
   - `header_row`: (Optional) Zero-based row index for the row that contains column names
   - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
   - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values.
-  - `pass_as_is`: (Optional) Dict mapping column names to lists of "non dates" that are passed through without being changed
+  - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to lists of values that `shift_excel_dates_inplace()` passes as-is with no manipulation or checking.
 - `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead.
 - `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead.
 - `min_shift_days` / `max_shift_days`: Range of days to shift (default: -15 to 15)

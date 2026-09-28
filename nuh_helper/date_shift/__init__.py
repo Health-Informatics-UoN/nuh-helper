@@ -469,10 +469,9 @@ def shift_excel_dates_inplace(
           - 'skip_rows_after_header': list of zero-based row indices to
             exclude from data (e.g. a data-type row immediately below the
             header)
-          - pass_as_is: a map of {column name: [value list]} of non-date
-            strings allowed in date cells. these are passed through
-            unchanged. blank entries, and, whitespace on the start/end of the
-            strings are always allowed.
+          - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to
+                lists of values that are passed as-is with no manipulation or
+                checking.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
@@ -668,8 +667,8 @@ def shift_excel_dates_inplace(
                 if not isinstance(original_value, datetime | date):
                     # check if it's one of the non-dates allowed
                     page_config = sheet_configs[sheet_name]
-                    pass_as_is = page_config.get("pass_as_is", {})
-                    allowed_non_dates = pass_as_is.get(col_name, [])
+                    shift_ignore = page_config.get("shift_ignore", {})
+                    allowed_non_dates = shift_ignore.get(col_name, [])
                     if (original_value is None) or (
                         original_value.strip() in allowed_non_dates
                     ):
