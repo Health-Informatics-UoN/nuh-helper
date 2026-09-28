@@ -7,12 +7,12 @@ from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import ShiftFoundNonDate
 
 
-@pytest.mark.parametrize("allow_passthrough", [True, False])
-def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
+@pytest.mark.parametrize("shift_ignore", [True, False])
+def test_ignore_in_dates(shift_ignore: bool, tmp_path: Path) -> None:
 
-    source_file = Path(__file__).parent / "data/passed/workbook.xlsx"
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
     output_path = tmp_path / "target.xlsx"
-    linking_table_old = Path(__file__).parent / "data/passed/offsets.csv"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -40,13 +40,13 @@ def test_just_shift(allow_passthrough: bool, tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    if not allow_passthrough:
+    if not shift_ignore:
         with pytest.raises(ShiftFoundNonDate) as info:
             body()
         assert str(info.value) == "page='page-data'[6, 2 @ col_name='dob'] val='mssing'"
         return
     else:
-        sheet_configs["page-data"]["pass_as_is"] = {"dob": ["mssing"]}
+        sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
         body()
 
     workbook = load_workbook(output_path)
