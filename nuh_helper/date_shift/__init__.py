@@ -609,9 +609,6 @@ def shift_excel_dates_inplace(
             else:
                 raise DateColumnMissing(sheet_name, col)
 
-        if not date_col_indices:
-            continue
-
         # Pre-parse exception dates once per column
         parsed_exceptions: dict[str, set[date]] = {}
         shift_exceptions_config: dict[str, list[str]] | None = config.get(
