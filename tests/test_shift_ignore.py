@@ -129,8 +129,11 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         # add the exception
         sheet_configs["page-desc"]["shift_ignore"] = {
             "glitter": [
-                "can't recall the date but on 12/11/2001 they had an itchy tummy"
-            ]
+                "can't recall the date but on 12/11/2001 they had an itchy tummy",
+            ],
+            "foo": [
+                "agreed on 21st jul 2017",
+            ],
         }
 
         # run the shift

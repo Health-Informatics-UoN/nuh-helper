@@ -11,6 +11,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import datefinder
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -529,25 +530,31 @@ def shift_excel_dates_inplace(
         if sheet_name not in sheet_configs:
             raise ExtraPage(sheet_name)
 
-    for sheet_name, config in sheet_configs.items():
+    for sheet_name, sheet_config in sheet_configs.items():
         if sheet_name not in wb.sheetnames:
             raise PageMissing(sheet_name)
 
-        if isinstance(config, str) and config == "skip":
+        if isinstance(sheet_config, str) and sheet_config == "skip":
             # it's a skipped sheet
             continue
 
-        assert isinstance(config, dict)
+        assert isinstance(sheet_config, dict)
 
-        assert "text_columns" in config, f"no text_columns setting for {sheet_name=}"
-        assert "date_columns" in config, f"no date_columns setting for {sheet_name=}"
+        assert "text_columns" in sheet_config, (
+            f"no text_columns setting for {sheet_name=}"
+        )
+        assert "date_columns" in sheet_config, (
+            f"no date_columns setting for {sheet_name=}"
+        )
 
         ws = cast(Worksheet, wb[sheet_name])
-        sheet_patient_id_col: str = cast(str, config["patient_id_col"])
-        date_columns: list[str] = cast(list[str], config["date_columns"])
-        text_columns: list[str] = cast(list[str], config["text_columns"])
-        header_row: int = cast(int, config.get("header_row", 0))
-        skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
+        sheet_patient_id_col: str = cast(str, sheet_config["patient_id_col"])
+        date_columns: list[str] = cast(list[str], sheet_config["date_columns"])
+        text_columns: list[str] = cast(list[str], sheet_config["text_columns"])
+        header_row: int = cast(int, sheet_config.get("header_row", 0))
+        skip_rows_after_header: list[int] | None = sheet_config.get(
+            "skip_rows_after_header"
+        )
 
         assert sheet_patient_id_col not in date_columns, (
             f"{sheet_patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
@@ -593,16 +600,18 @@ def shift_excel_dates_inplace(
 
             elif (
                 # check the config to see if we know what to do with this column
-                (col_name not in config["date_columns"])
-                and (col_name not in config["text_columns"])
-                and (col_name != config["patient_id_col"])
+                (col_name not in sheet_config["date_columns"])
+                and (col_name not in sheet_config["text_columns"])
+                and (col_name != sheet_config["patient_id_col"])
             ):
                 raise ExtraColumn(sheet_name, col_name)
             else:
                 # happy normal column
                 col_indexes[col_name] = col_index
 
-        for text_column in [config["patient_id_col"]] + config["text_columns"]:
+        for text_column in [sheet_config["patient_id_col"]] + sheet_config[
+            "text_columns"
+        ]:
             if text_column not in header_values:
                 raise TextColumnMissing(sheet_name, text_column)
 
@@ -621,7 +630,7 @@ def shift_excel_dates_inplace(
 
         # Pre-parse exception dates once per column
         parsed_exceptions: dict[str, set[date]] = {}
-        shift_exceptions_config: dict[str, list[str]] | None = config.get(
+        shift_exceptions_config: dict[str, list[str]] | None = sheet_config.get(
             "shift_exceptions"
         )
         if shift_exceptions_config:
@@ -710,12 +719,22 @@ def shift_excel_dates_inplace(
                     continue
 
                 value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
-                import datefinder
 
                 for found in datefinder.find_dates(value):
-                    raise HiddenDate(
-                        sheet_name, row_idx, non_date_col_idx, col_name, value, found
-                    )
+                    # skip ignored values
+                    sheet_ignored = sheet_config.get("shift_ignore", {})
+                    col_ignored = sheet_ignored.get(col_name, [])
+                    if value is None or value == "" or value in col_ignored:
+                        pass
+                    else:
+                        raise HiddenDate(
+                            sheet_name,
+                            row_idx,
+                            non_date_col_idx,
+                            col_name,
+                            value,
+                            found,
+                        )
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)
