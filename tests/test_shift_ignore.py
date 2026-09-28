@@ -43,7 +43,7 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
     if not shift_ignore:
         with pytest.raises(ShiftFoundNonDate) as info:
             body()
-        assert str(info.value) == "page='page-data'[6, 2 @ col_name='dob'] val='mssing'"
+        assert str(info.value) == "page='page-data'[5, 1 @ col_name='dob'] val='mssing'"
         return
     else:
         sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
@@ -119,7 +119,7 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         with pytest.raises(HiddenDate) as info:
             body()
         assert str(info.value._message) == (
-            "hidden date in [sheet_name='page-desc', 3, 3 @ glitter] "
+            "hidden date in [sheet_name='page-desc', 2, 2 @ glitter] "
             + 'value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
             + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
         )
