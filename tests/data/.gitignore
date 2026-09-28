@@ -1,2 +1,5 @@
 !*.csv
 !*.xlsx
+
+# ignore temp excel files
+~$*.xlsx
