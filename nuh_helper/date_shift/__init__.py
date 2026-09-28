@@ -43,14 +43,24 @@ class ShiftFoundNonDate(Exception):
 
 class HiddenDate(Exception):
     def __init__(
-        self, sheet_name: str, row: int, col: int, value: str, found: datetime
+        self,
+        sheet_name: str,
+        row: int,
+        col: int,
+        col_name: str,
+        value: str,
+        found: datetime,
     ) -> None:
-        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
+        message = (
+            f"hidden date in [{sheet_name=}, {row}, {col} @ {col_name}] {value=} "
+            + f"// {found=}"
+        )
         super().__init__(message)
         self._message = message
         self._sheet_name = sheet_name
         self._row = row
         self._col = col
+        self._col_name = col_name
         self._value = value
         self._found = found
 
@@ -704,7 +714,7 @@ def shift_excel_dates_inplace(
 
                 for found in datefinder.find_dates(value):
                     raise HiddenDate(
-                        sheet_name, row_idx, non_date_col_idx, value, found
+                        sheet_name, row_idx, non_date_col_idx, col_name, value, found
                     )
 
     wb.save(output_file)

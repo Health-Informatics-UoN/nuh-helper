@@ -119,17 +119,42 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         with pytest.raises(HiddenDate) as info:
             body()
         assert str(info.value._message) == (
-            "hidden date in [sheet_name='page-desc', 3, 3] "
+            "hidden date in [sheet_name='page-desc', 3, 3 @ glitter] "
             + 'value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
             + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
         )
         return
 
     else:
-        raise Exception("add the exception")
+        # add the exception
+        sheet_configs["page-desc"]["shift_ignore"] = {
+            "glitter": [
+                "can't recall the date but on 12/11/2001 they had an itchy tummy"
+            ]
+        }
 
-        # sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
+        # run the shift
         body()
 
-        # workbook = load_workbook(output_path)
-        raise Exception("do checks?")
+        workbook = load_workbook(output_path)
+        page = workbook["page-desc"]
+
+        obtained = [
+            [str(page.cell(row + 1, col + 1).value) for col in range(page.max_column)]
+            for row in range(page.max_row)
+        ]
+
+        expected = [
+            ["foo", "pid", "glitter"],
+            ["bar", "nuh71", "road"],
+            [
+                "shoe",
+                "nuh06",
+                "can't recall the date but on 12/11/2001 they had an itchy tummy",
+            ],
+            ["agreed on 21st jul 2017", "nuh23", "grip"],
+            ["farm", "nuh67", "grim"],
+            ["cake", "nuh27", "cheese"],
+        ]
+
+        assert expected == obtained
