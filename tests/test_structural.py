@@ -58,8 +58,8 @@ def test_with_blank_column(good: bool, tmp_path: Path) -> None:
         with pytest.raises(BlankColumnHasData) as info:
             body()
         assert info.value._page == "paige"
-        assert info.value._row == 3
-        assert info.value._col == 2
+        assert info.value._row == 2
+        assert info.value._col == 1
         assert info.value._value == "forbidden"
 
 

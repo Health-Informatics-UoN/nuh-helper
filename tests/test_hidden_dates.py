@@ -44,7 +44,7 @@ def test_iso8601(tmp_path: Path) -> None:
         )
 
     assert info.value._message == (
-        "hidden date in [sheet_name='args', 4, 3 @ dob]"
+        "hidden date in [sheet_name='args', 3, 2 @ diagnosis]"
         + " value='hives on 2023-10-12'"
         + " // found=datetime.datetime(2023, 10, 12, 0, 0)"
     )
@@ -85,7 +85,7 @@ def test_us_date(tmp_path: Path) -> None:
         )
 
     assert info.value._message == (
-        "hidden date in [sheet_name='data', 6, 3 @ dob]"
+        "hidden date in [sheet_name='data', 5, 2 @ diagnosis]"
         + ' value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
         + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
     )
@@ -126,7 +126,7 @@ def test_written(tmp_path: Path) -> None:
         )
 
     assert info.value._message == (
-        "hidden date in [sheet_name='yeah', 5, 3 @ dob]"
+        "hidden date in [sheet_name='yeah', 4, 2 @ diagnosis]"
         + " value='flu on mar 21st, 2009'"
         + " // found=datetime.datetime(2009, 3, 21, 0, 0)"
     )
@@ -167,7 +167,7 @@ def test_hidden_in_patient_id(tmp_path: Path) -> None:
         )
 
     assert info.value._sheet_name == "data"
-    assert info.value._row == 5
-    assert info.value._col == 1
+    assert info.value._row == 4
+    assert info.value._col == 0
     assert info.value._value == "nuh012 12/11/2001"
     assert info.value._found == datetime(2001, 12, 11)
