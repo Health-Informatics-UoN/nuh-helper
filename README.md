@@ -5,7 +5,7 @@ Helper library for enabling data studies: utilities for study enablement such as
 ## Notebook Installation
 
 ```bash
-!pip install git+https://github.com/Health-Informatics-UoN/nuh-helper.git
+! pip install git+https://github.com/Health-Informatics-UoN/nuh-helper.git
 ```
 
 ## Modules
