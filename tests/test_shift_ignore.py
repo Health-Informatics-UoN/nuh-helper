@@ -4,11 +4,11 @@ import pytest
 from openpyxl import load_workbook
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import ShiftFoundNonDate
+from nuh_helper.date_shift import HiddenDate, ShiftFoundNonDate
 
 
 @pytest.mark.parametrize("shift_ignore", [True, False])
-def test_ignore_in_dates(shift_ignore: bool, tmp_path: Path) -> None:
+def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
 
     source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
     output_path = tmp_path / "target.xlsx"
@@ -79,3 +79,57 @@ def test_ignore_in_dates(shift_ignore: bool, tmp_path: Path) -> None:
     assert worksheet.cell(5, 2).value is None
     assert str(worksheet.cell(6, 2).value) == "mssing"  # change that's under test
     assert str(worksheet.cell(7, 2).value) == "1999-11-30 00:00:00"
+
+
+@pytest.mark.parametrize("shift_ignore", [True, False])
+def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": {
+            "patient_id_col": "pid",
+            "date_columns": [],
+            "text_columns": ["foo", "glitter"],
+            "header_row": 0,
+            "skip_rows_after_header": [],
+        },
+        "page-data": "skip",
+    }
+
+    def body() -> None:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-desc",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+
+    if not shift_ignore:
+        print(output_path)
+        with pytest.raises(HiddenDate) as info:
+            body()
+        assert str(info.value._message) == (
+            "hidden date in [sheet_name='page-desc', 3, 3] "
+            + 'value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
+            + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
+        )
+        return
+
+    else:
+        raise Exception("add the exception")
+
+        # sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
+        body()
+
+        # workbook = load_workbook(output_path)
+        raise Exception("do checks?")
