@@ -158,6 +158,7 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
             ["agreed on 21st jul 2017", "nuh23", "grip"],
             ["farm", "nuh67", "grim"],
             ["cake", "nuh27", "cheese"],
+            ["glip", "nuh65", "jkl"],
         ]
 
         assert expected == obtained
