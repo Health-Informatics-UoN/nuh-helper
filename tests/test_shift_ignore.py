@@ -7,6 +7,192 @@ from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import HiddenDate, ShiftFoundNonDate
 
 
+def test_shift_exceptions(tmp_path: Path) -> None:
+    """check that misconfigurations cause an error"""
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": "skip",
+        "page-data": {
+            "patient_id_col": "pid",
+            "date_columns": ["dob"],
+            "text_columns": ["top"],
+            "header_row": 1,
+            "skip_rows_after_header": [],
+            "shift_exceptions": {"dob": ["mssing"]},
+        },
+    }
+    with pytest.raises(RuntimeError) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-data",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+    assert str(info.value) == (
+        "shift_exceptions was removed, update sheet_name='page-data'"
+    )
+
+
+def test_ptid_in_date_columns(tmp_path: Path) -> None:
+    """check that misconfigurations cause an error"""
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": "skip",
+        "page-data": {
+            "patient_id_col": "pid",
+            "date_columns": ["dob", "pid"],
+            "text_columns": ["top"],
+            "header_row": 1,
+            "skip_rows_after_header": [],
+            "shift_ignore": {"dob": ["mssing"]},
+        },
+    }
+    with pytest.raises(ValueError) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-data",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+    assert str(info.value) == (
+        "patient_id_col='pid' shouldn't be in date_columns of sheet_name='page-data'"
+    )
+
+
+def test_ptid_in_text_columns(tmp_path: Path) -> None:
+    """check that misconfigurations cause an error"""
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": "skip",
+        "page-data": {
+            "patient_id_col": "pid",
+            "date_columns": ["dob"],
+            "text_columns": ["top", "pid"],
+            "header_row": 1,
+            "skip_rows_after_header": [],
+            "shift_ignore": {"dob": ["mssing"]},
+        },
+    }
+    with pytest.raises(ValueError) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-data",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+    assert str(info.value) == (
+        "patient_id_col='pid' shouldn't be in text_columns of sheet_name='page-data'"
+    )
+
+
+def test_columns_overlap(tmp_path: Path) -> None:
+    """check that misconfigurations cause an error"""
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": "skip",
+        "page-data": {
+            "patient_id_col": "pid",
+            "date_columns": ["dob"],
+            "text_columns": ["top", "dob"],
+            "header_row": 1,
+            "skip_rows_after_header": [],
+            "shift_ignore": {"dob": ["mssing"]},
+        },
+    }
+    with pytest.raises(ValueError) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-data",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+    assert str(info.value) == (
+        "sheet_name='page-data' has the some columns in both date and text "
+        + "col_names=['dob']"
+    )
+
+
+def test_ptid_column_missing(tmp_path: Path) -> None:
+    """check that misconfigurations cause an error"""
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": "skip",
+        "page-data": {
+            "patient_id_col": "ptid",
+            "date_columns": ["dob"],
+            "text_columns": ["top", "pid"],
+            "header_row": 1,
+            "skip_rows_after_header": [],
+            "shift_ignore": {"dob": ["mssing"]},
+        },
+    }
+    with pytest.raises(NameError) as info:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-data",
+            patient_id_col="pid",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+    assert str(info.value) == (
+        "patient_id_col='ptid' column not in sheet_name='page-data'"
+    )
+
+
 @pytest.mark.parametrize("shift_ignore", [True, False])
 def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
 
@@ -66,14 +252,19 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
     assert worksheet.cell(6, 1).value == "nuh67"
     assert worksheet.cell(7, 1).value == "nuh27"
 
+    # check column 3 is all none
+    assert not [
+        val for val in [worksheet.cell(r + 1, 3).value for r in range(7)] if val
+    ]
+
     # last column
-    assert worksheet.cell(1, 3).value == "pizza topping"
-    assert worksheet.cell(2, 3).value == "top"
-    assert worksheet.cell(3, 3).value == "cheese"
-    assert worksheet.cell(4, 3).value == "unknown"
-    assert worksheet.cell(5, 3).value == "mushrooms"
-    assert worksheet.cell(6, 3).value == "this can't be a date - sorry 2016"
-    assert worksheet.cell(7, 3).value == "idk - this can't be a date anymore"
+    assert worksheet.cell(1, 4).value == "pizza topping"
+    assert worksheet.cell(2, 4).value == "top"
+    assert worksheet.cell(3, 4).value == "cheese"
+    assert worksheet.cell(4, 4).value == "unknown"
+    assert worksheet.cell(5, 4).value == "mushrooms"
+    assert worksheet.cell(6, 4).value == "this can't be a date - sorry 2016"
+    assert worksheet.cell(7, 4).value == "idk - this can't be a date anymore"
 
     # the important column to check - the dates
     assert worksheet.cell(1, 2).value == "birthday"
