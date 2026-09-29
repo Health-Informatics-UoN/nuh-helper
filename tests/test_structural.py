@@ -5,11 +5,11 @@ import pytest
 from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import (
     BlankColumnHasData,
-    DateColumnMissing,
+    DateColumnsMissing,
     ExtraColumn,
     ExtraPage,
     PageMissing,
-    TextColumnMissing,
+    TextColumnsMissing,
 )
 
 
@@ -85,7 +85,7 @@ def test_date_column_missing(tmp_path: Path) -> None:
         },
         "stuff": "skip",
     }
-    with pytest.raises(DateColumnMissing) as info:
+    with pytest.raises(DateColumnsMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -99,7 +99,7 @@ def test_date_column_missing(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._column_name == "a-missing-date-column"
+    assert info.value._column_names == ["a-missing-date-column"]
 
 
 def test_extra_column(tmp_path: Path) -> None:
@@ -162,7 +162,7 @@ def test_text_column_missing(tmp_path: Path) -> None:
         },
         "stuff": "skip",
     }
-    with pytest.raises(TextColumnMissing) as info:
+    with pytest.raises(TextColumnsMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -176,7 +176,7 @@ def test_text_column_missing(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._column_name == "a-missing-text-column"
+    assert info.value._column_names == ["a-missing-text-column"]
 
 
 def test_page_missing(tmp_path: Path) -> None:
