@@ -650,7 +650,7 @@ def shift_excel_dates_inplace(
             if row_idx in skip_rows:
                 continue
 
-            # update the user every 40 rows
+            # write a log message for the user every 40 rows
             if (row_idx % 40) == 0:
                 logger.info(f"Shifting {sheet_name=} up to row {row_idx}")
 
@@ -755,14 +755,14 @@ def shift_excel_dates_inplace(
                     cell.value = cell_value
                     continue
 
+                # we've already checked this (sort of)
                 # assert col_name in date_columns
-                # ... which has to be true ...
 
                 # cell_value can be str | datetime | date
                 # ... so parsed might not always succeed
                 parsed = _parse._parse_date_value(cell_value)
                 if parsed is None:
-                    # raise an error; we already handled
+                    # raise an error; we already handled values we should pass as-is
                     raise ShiftFoundNonDate(
                         sheet_name, row_idx, col_idx, col_name, cell_value
                     )
