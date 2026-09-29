@@ -776,6 +776,7 @@ def shift_excel_dates_inplace(
                     cell.value = cast(Any, shifted.to_pydatetime())
                 else:
                     cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.number_format = "yyyy-mm-dd"
 
         logger.info(f"Shifting {sheet_name=} processed {row_idx} rows")
 
