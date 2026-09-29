@@ -771,7 +771,7 @@ def shift_excel_dates_inplace(
                 shifted = parsed + shift_delta
 
                 # controls wether the data is displayed with the 00:00:00 in Excel
-                # ... it might be nice to just convert it all to iso8601 text
+                # ... it might be nice to just drop the time if it's 00:00:00
                 if isinstance(cell_value, datetime):
                     cell.value = cast(Any, shifted.to_pydatetime())
                 else:
