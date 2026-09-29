@@ -43,7 +43,11 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
     if not shift_ignore:
         with pytest.raises(ShiftFoundNonDate) as info:
             body()
-        assert str(info.value) == "page='page-data'[5, 1 @ col_name='dob'] val='mssing'"
+        assert info.value._page == "page-data"
+        assert info.value._row == 5
+        assert info.value._col == 1
+        assert info.value._col_name == "dob"
+        assert info.value._value == "mssing"
         return
     else:
         sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
