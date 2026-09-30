@@ -6,15 +6,14 @@ in an Excel file, with support for reproducible shifts using a linking table.
 """
 
 import logging
-import shutil
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import datefinder
 import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.worksheet.worksheet import Worksheet
+from book_page import CSVBook, XLSXBook
+from book_page.book import Page
 
 from nuh_helper.date_shift import _excel, _parse, mappings
 
@@ -159,7 +158,7 @@ class ExtraPage(Exception):
 
 
 def _get_patient_ids_and_shift_mappings(
-    input_file: str,
+    input_file: XLSXBook | CSVBook,
     patient_sheet: str,
     patient_id_col: str,
     sheet_configs: dict[str, dict[str, Any]],
@@ -462,8 +461,8 @@ def shift_excel_dates(
 
 
 def shift_excel_dates_inplace(
-    input_file: str,
-    output_file: str,
+    input_file: str | Path | list[Path],
+    output_file: str | Path,
     patient_sheet: str,
     patient_id_col: str,
     sheet_configs: dict[str, dict[str, Any]],
@@ -519,10 +518,13 @@ def shift_excel_dates_inplace(
         seed,
     )
 
-    shutil.copy2(input_file, output_file)
+    if str(input_file).endswith(".xlsx"):
+        book: XLSXBook = XLSXBook.copy(input_file, output_file)
+    else:
+        book: CSVBook = CSVBook.copy(input_file, output_file)
 
     _patient_ids, shift_mappings = _get_patient_ids_and_shift_mappings(
-        input_file=input_file,
+        input_file=book,
         patient_sheet=patient_sheet,
         patient_id_col=patient_id_col,
         sheet_configs=sheet_configs,
@@ -542,11 +544,8 @@ def shift_excel_dates_inplace(
         )
     )
 
-    wb = load_workbook(output_file, keep_links=False)
-    wb.defined_names.clear()
-
     # check for sheets we didn't have an explanation for
-    for sheet_name in wb.sheetnames:
+    for sheet_name in book:
         if sheet_name not in sheet_configs:
             raise ExtraPage(sheet_name)
 
@@ -556,7 +555,7 @@ def shift_excel_dates_inplace(
         # load the workbook sheet and configuration
         ##
 
-        if sheet_name not in wb.sheetnames:
+        if sheet_name not in book:
             raise PageMissing(sheet_name)
 
         if isinstance(sheet_config, str) and sheet_config == "skip":
@@ -566,7 +565,25 @@ def shift_excel_dates_inplace(
         logger.info(f"Shifting {sheet_name=}")
 
         # these will raise errors if the keys are missing - that's fine
-        ws = cast(Worksheet, wb[sheet_name])
+        with book[sheet_name] as page:
+            function_that_preserves_indentation(
+                shift_dict, sheet_name, sheet_config, page
+            )
+
+    logger.info("Output written to '%s'", output_file)
+
+    linking_path = linking_table_output or "shift_mappings.csv"
+    shift_mappings.to_csv(linking_path, index=False)
+    logger.info("Linking table saved to '%s'", linking_path)
+
+
+def function_that_preserves_indentation(
+    shift_dict: dict[str, pd.Timedelta],
+    sheet_name: str,
+    sheet_config: dict[str, any],
+    page: Page,
+) -> None:
+    if True:
         patient_id_col: str = cast(str, sheet_config["patient_id_col"]).strip()
         date_columns: list[str] = [col.strip() for col in sheet_config["date_columns"]]
         text_columns: list[str] = [col.strip() for col in sheet_config["text_columns"]]
@@ -598,9 +615,8 @@ def shift_excel_dates_inplace(
             raise ValueError(
                 f"{sheet_name=} has the some columns in both date and text {col_names=}"
             )
-        col_names = _excel._get_row_values_resolving_merged(
-            ws, header_row + 1, ws.max_column + 1
-        )
+        # get teh real column names now
+        col_names = [page[header_row, c].value for c in range(page.columns)]
 
         # find patient_id_idx and normalize the column name list
         patient_id_idx = None
@@ -653,7 +669,7 @@ def shift_excel_dates_inplace(
         ###
         # process each row of the workbook
         ##
-        for row_idx in range(ws.max_row):
+        for row_idx in range(page.rows):
             # skip all rows that happen before the header row
             if row_idx <= header_row:
                 continue
@@ -667,7 +683,7 @@ def shift_excel_dates_inplace(
                 logger.info(f"Shifting {sheet_name=} up to row {row_idx}")
 
             # get the patient id for this row
-            cell_value = ws.cell(row=row_idx + 1, column=patient_id_idx + 1).value
+            cell_value = page[row_idx, patient_id_idx].value
 
             if cell_value:
                 if not isinstance(cell_value, str):
@@ -698,9 +714,9 @@ def shift_excel_dates_inplace(
                         (
                             col_idx,
                             col_names[col_idx],
-                            ws.cell(row=row_idx + 1, column=col_idx + 1).value,
+                            page[row_idx, col_idx].value,
                         )
-                        for col_idx in range(ws.max_column)
+                        for col_idx in range(page.columns)
                     ]
                     # keep the cells that aren't blank
                     if cell[2] is not None and cell[2].strip() != ""
@@ -723,13 +739,13 @@ def shift_excel_dates_inplace(
 
             # now scan each column
             # ... even when page has no date_columns; still check for hidden dates
-            for col_idx in range(ws.max_column):
+            for col_idx in range(page.columns):
                 # skip the patient id column (it was already checked anyway)
                 if col_idx == patient_id_idx:
                     continue
 
                 # get the cell value. replace it with None if it's just whitespace
-                cell = ws.cell(row=row_idx + 1, column=col_idx + 1)
+                cell = page[row_idx, col_idx]
                 cell_value = cell.value
                 if isinstance(cell_value, str):
                     cell_value = cell_value.strip()
@@ -791,13 +807,6 @@ def shift_excel_dates_inplace(
                     cell.number_format = "yyyy-mm-dd"
 
         logger.info(f"Shifting {sheet_name=} processed {row_idx} rows")
-
-    wb.save(output_file)
-    logger.info("Output written to '%s'", output_file)
-
-    linking_path = linking_table_output or "shift_mappings.csv"
-    shift_mappings.to_csv(linking_path, index=False)
-    logger.info("Linking table saved to '%s'", linking_path)
 
 
 # Re-export public API

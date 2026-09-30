@@ -9,6 +9,7 @@ dependencies = [
     "pandas>=3.0.5",
     "openpyxl>=3.1.0",
     "datefinder>=1.0.0",
+    "book-page",
 ]
 
 [build-system]
@@ -36,6 +37,9 @@ dev = [
 
 [tool.uv]
 exclude-newer = "7 days"
+
+[tool.uv.sources]
+book-page = { git = "https://github.com/peterlavalle/book_page.git" }
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
