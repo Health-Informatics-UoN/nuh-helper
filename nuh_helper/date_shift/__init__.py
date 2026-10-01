@@ -11,6 +11,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import datefinder
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
@@ -28,10 +29,18 @@ class UnknownPatient(Exception):
 
 
 class ShiftFoundNonDate(Exception):
-    def __init__(self, page: str, row: int, col: int, col_name: str, val: str) -> None:
-        message = f"{page=}[{row}, {col} @ {col_name=}] {val=}"
+    def __init__(
+        self, page: str, row: int, col: int, col_name: str, value: str
+    ) -> None:
+        # the spaces and newline in the message make the value easier to copy/paste back
+        message = f"{page=}[{row}, {col} @   {col_name=}  ]\n\t'{value}'"
         super().__init__(message)
-        self._message = message
+        self._message: str = message
+        self._page: str = page
+        self._row: int = row
+        self._col: int = col
+        self._col_name: str = col_name
+        self._value: str = value
 
 
 # >> pr 127 Exception goes here
@@ -43,14 +52,24 @@ class ShiftFoundNonDate(Exception):
 
 class HiddenDate(Exception):
     def __init__(
-        self, sheet_name: str, row: int, col: int, value: str, found: datetime
+        self,
+        sheet_name: str,
+        row: int,
+        col: int,
+        col_name: str,
+        value: str,
+        found: datetime,
     ) -> None:
-        message = f"hidden date in [{sheet_name=}, {row}, {col}] {value=} // {found=}"
+        message = (
+            f"hidden date in [{sheet_name=}, {row}, {col} @ {col_name}] {value=} "
+            + f"// {found=}"
+        )
         super().__init__(message)
         self._message = message
         self._sheet_name = sheet_name
         self._row = row
         self._col = col
+        self._col_name = col_name
         self._value = value
         self._found = found
 
@@ -59,24 +78,24 @@ class HiddenDate(Exception):
 # << end of pr 131
 
 
-class DateColumnMissing(Exception):
-    def __init__(self, page_name: str, column_name: str) -> None:
-        message = f"date {column_name=} is missing from the cdm {page_name=}"
+class DateColumnsMissing(Exception):
+    def __init__(self, page_name: str, column_names: list[str]) -> None:
+        message = f"date {column_names=} is missing from the cdm {page_name=}"
         super().__init__(message)
         self._message = message
 
         self._page_name = page_name
-        self._column_name = column_name
+        self._column_names = column_names
 
 
-class TextColumnMissing(Exception):
-    def __init__(self, page_name: str, column_name: str) -> None:
-        message = f"un-shifted {column_name=} is missing from the cdm {page_name=}"
+class TextColumnsMissing(Exception):
+    def __init__(self, page_name: str, column_names: list[str]) -> None:
+        message = f"text {column_names=} is missing from the cdm {page_name=}"
         super().__init__(message)
         self._message = message
 
         self._page_name = page_name
-        self._column_name = column_name
+        self._column_names = column_names
 
 
 class BlankColumnHasData(Exception):
@@ -92,6 +111,18 @@ class BlankColumnHasData(Exception):
         self._row: int = row
         self._col: int = col
         self._value: any = value
+
+
+class PatientColumnMissing(Exception):
+    """raised when the patient column is missing from any sheet"""
+
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = f"The patient {column_name=} is not present on {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
 
 
 class ExtraColumn(Exception):
@@ -441,8 +472,8 @@ def shift_excel_dates_inplace(
     linking_table_path: str | None = None,
     linking_table_output: str | None = None,
     seed: int | None = None,
-    patient_header_row: int = 0,
-    patient_skip_rows: list[int] | None = None,
+    header_row: int = 0,
+    skip_rows: list[int] | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -469,10 +500,9 @@ def shift_excel_dates_inplace(
           - 'skip_rows_after_header': list of zero-based row indices to
             exclude from data (e.g. a data-type row immediately below the
             header)
-          - pass_as_is: a map of {column name: [value list]} of non-date
-            strings allowed in date cells. these are passed through
-            unchanged. blank entries, and, whitespace on the start/end of the
-            strings are always allowed.
+          - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to
+                lists of values that are passed as-is with no manipulation or
+                checking.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
@@ -500,8 +530,8 @@ def shift_excel_dates_inplace(
         max_shift_days=max_shift_days,
         linking_table_path=linking_table_path,
         seed=seed,
-        patient_header_row=patient_header_row,
-        patient_skip_rows=patient_skip_rows,
+        patient_header_row=header_row,
+        patient_skip_rows=skip_rows,
     )
 
     shift_dict: dict[str, int] = dict(
@@ -520,196 +550,247 @@ def shift_excel_dates_inplace(
         if sheet_name not in sheet_configs:
             raise ExtraPage(sheet_name)
 
-    for sheet_name, config in sheet_configs.items():
+    # start looping through each sheet in the configuration
+    for sheet_name, sheet_config in sheet_configs.items():
+        ###
+        # load the workbook sheet and configuration
+        ##
+
         if sheet_name not in wb.sheetnames:
             raise PageMissing(sheet_name)
 
-        if isinstance(config, str) and config == "skip":
+        if isinstance(sheet_config, str) and sheet_config == "skip":
             # it's a skipped sheet
+            logger.info(f"Skipping {sheet_name=}")
             continue
+        logger.info(f"Shifting {sheet_name=}")
 
-        assert isinstance(config, dict)
-
-        assert "text_columns" in config, f"no text_columns setting for {sheet_name=}"
-        assert "date_columns" in config, f"no date_columns setting for {sheet_name=}"
-
+        # these will raise errors if the keys are missing - that's fine
         ws = cast(Worksheet, wb[sheet_name])
-        sheet_patient_id_col: str = cast(str, config["patient_id_col"])
-        date_columns: list[str] = cast(list[str], config["date_columns"])
-        text_columns: list[str] = cast(list[str], config["text_columns"])
-        header_row: int = cast(int, config.get("header_row", 0))
-        skip_rows_after_header: list[int] | None = config.get("skip_rows_after_header")
+        patient_id_col: str = cast(str, sheet_config["patient_id_col"]).strip()
+        date_columns: list[str] = [col.strip() for col in sheet_config["date_columns"]]
+        text_columns: list[str] = [col.strip() for col in sheet_config["text_columns"]]
 
-        assert sheet_patient_id_col not in date_columns, (
-            f"{sheet_patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
-        )
-        assert sheet_patient_id_col not in text_columns, (
-            f"{sheet_patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
-        )
+        header_row: int = cast(int, sheet_config.get("header_row", 0))
+        skip_rows: list[int] = sheet_config.get("skip_rows_after_header", [])
 
-        max_col = ws.max_column or 0
-        if not max_col:
-            continue
+        ###
+        # do some checks of the configuration
+        ##
 
-        header_row_1based = header_row + 1
-        header_values = _excel._get_row_values_resolving_merged(
-            ws, header_row_1based, max_col
-        )
-        col_indexes: dict[str, int] = {}
-        for col_index, col_name in enumerate(header_values, start=1):
-            # simplify the column name
-            col_name = str(col_name).strip() if col_name is not None else ""
+        # this is an old field i want to be careful about skipping
+        if "shift_exceptions" in sheet_config:
+            raise RuntimeError(f"shift_exceptions was removed, update {sheet_name=}")
 
-            if col_name == "":
-                # there's no column name - the column should be blank
-                # loop through the values in that column to be sure they're all empty
-                # check each row
-                for row in range(ws.max_row):
-                    row += 1
-
-                    value = ws.cell(row, col_index).value
-
-                    # blank is good
-                    if value is None:
-                        continue
-
-                    # empty strings are also fine
-                    if str(value).strip() == "":
-                        continue
-
-                    # raise an error
-                    raise BlankColumnHasData(sheet_name, row, col_index, value)
-
-                # we don't do more work on blank columns
-
-            elif (
-                # check the config to see if we know what to do with this column
-                (col_name not in config["date_columns"])
-                and (col_name not in config["text_columns"])
-                and (col_name != config["patient_id_col"])
-            ):
-                raise ExtraColumn(sheet_name, col_name)
-            else:
-                # happy normal column
-                col_indexes[col_name] = col_index
-
-        for text_column in [config["patient_id_col"]] + config["text_columns"]:
-            if text_column not in header_values:
-                raise TextColumnMissing(sheet_name, text_column)
-
-        if sheet_patient_id_col not in col_indexes:
+        # check patient_id_col isn't re-used as other column types
+        if patient_id_col in date_columns:
             raise ValueError(
-                f"Patient ID column '{sheet_patient_id_col}' not found in sheet '{sheet_name}'"  # noqa: E501
+                f"{patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
+            )
+        if patient_id_col in text_columns:
+            raise ValueError(
+                f"{patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
             )
 
-        pid_col_idx = col_indexes[sheet_patient_id_col]
-        date_col_indices: dict[str, int] = {}
-        for col in date_columns:
-            if col in col_indexes:
-                date_col_indices[col] = col_indexes[col]
-            else:
-                raise DateColumnMissing(sheet_name, col)
-
-        if not date_col_indices:
-            continue
-
-        # Pre-parse exception dates once per column
-        parsed_exceptions: dict[str, set[date]] = {}
-        shift_exceptions_config: dict[str, list[str]] | None = config.get(
-            "shift_exceptions"
-        )
-        if shift_exceptions_config:
-            for exc_col, exc_values in shift_exceptions_config.items():
-                parsed_set: set[date] = set()
-                for v in exc_values:
-                    ts = _parse._parse_date_value(v)
-                    if ts is not None:
-                        parsed_set.add(ts.date())
-                if parsed_set:
-                    parsed_exceptions[exc_col] = parsed_set
-
-        skip_row_set: set[int] = (
-            {idx + 1 for idx in skip_rows_after_header}
-            if skip_rows_after_header
-            else set()
+        # check that column names don't appear in both
+        col_names = [col for col in date_columns if col in text_columns]
+        if col_names:
+            raise ValueError(
+                f"{sheet_name=} has the some columns in both date and text {col_names=}"
+            )
+        col_names = _excel._get_row_values_resolving_merged(
+            ws, header_row + 1, ws.max_column + 1
         )
 
-        logger.info(
-            "Shifting %d date column(s) in sheet '%s'",
-            len(date_col_indices),
-            sheet_name,
-        )
+        # find patient_id_idx and normalize the column name list
+        patient_id_idx = None
+        for col_idx in range(len(col_names)):
+            col_name = col_names[col_idx]
 
-        data_start_1based = header_row + 2
-        for row_idx in range(data_start_1based, (ws.max_row or 0) + 1):
-            if row_idx in skip_row_set:
+            # if the name is None ... leave it as that (it's fine)
+            if col_name is None:
                 continue
 
-            pid_cell = ws.cell(row=row_idx, column=pid_col_idx)
-            pid = _parse._normalize_patient_id(pid_cell.value)
+            # strip the name
+            col_name = col_name.strip()
 
+            # if the name is now blank; store None as the column name
+            if col_name == "":
+                col_names[col_idx] = None
+                continue
+
+            # update it to just be the stripped version
+            col_names[col_idx] = col_name
+
+            # check the config to see if we know what to do with this column
+            if col_name not in ([patient_id_col] + date_columns + text_columns):
+                raise ExtraColumn(sheet_name, col_name)
+
+            #
+            if col_name == patient_id_col:
+                patient_id_idx = col_idx
+
+        # check to be sure we found the patient_id_col/patient_id_idx
+        if patient_id_idx is None:
+            raise PatientColumnMissing(sheet_name, patient_id_col)
+
+        missing = [col for col in text_columns if col not in col_names]
+        if missing:
+            raise TextColumnsMissing(sheet_name, missing)
+        missing = [col for col in date_columns if col not in col_names]
+        if missing:
+            raise DateColumnsMissing(sheet_name, missing)
+
+        # map and strip the shift_ignore values
+        shift_ignore = {
+            col_name: [
+                ignore.strip()
+                for ignore in sheet_config.get("shift_ignore", {}).get(col_name, [])
+            ]
+            for col_name in col_names
+        }
+
+        ###
+        # process each row of the workbook
+        ##
+        for row_idx in range(ws.max_row):
+            # skip all rows that happen before the header row
+            if row_idx <= header_row:
+                continue
+
+            # skip any skip rows
+            if row_idx in skip_rows:
+                continue
+
+            # write a log message for the user every 40 rows
+            if (row_idx % 40) == 0:
+                logger.info(f"Shifting {sheet_name=} up to row {row_idx}")
+
+            # get the patient id for this row
+            cell_value = ws.cell(row=row_idx + 1, column=patient_id_idx + 1).value
+
+            if cell_value:
+                if not isinstance(cell_value, str):
+                    raise ValueError(
+                        f"bad val {sheet_name=} {patient_id_col=} ;; {cell_value=}"
+                    )
+
+                cell_value = cell_value.strip()
+
+            # check for date in the cell_value
+            for found in datefinder.find_dates(str(cell_value)):
+                raise HiddenDate(
+                    sheet_name,
+                    row_idx,
+                    patient_id_idx,
+                    patient_id_col,
+                    cell_value,
+                    found,
+                )
+
+            pid = _parse._normalize_patient_id(cell_value)
             if pid is None:
-                # skip rows with no person id
+                # if the pid is None; the rest of the row should be None as well
+                non_blank = [
+                    cell
+                    for cell in [
+                        # get all cells
+                        (
+                            col_idx,
+                            col_names[col_idx],
+                            ws.cell(row=row_idx + 1, column=col_idx + 1).value,
+                        )
+                        for col_idx in range(ws.max_column)
+                    ]
+                    # keep the cells that aren't blank
+                    if cell[2] is not None and cell[2].strip() != ""
+                ]
+                if non_blank:
+                    raise ValueError(
+                        f"{row_idx=} has no pid, should be blank but has {non_blank}"
+                    )
+
+                # we've completed the checks for a None pid
+                # ... so we need to skip the rest of this loop
                 continue
 
+            # determine how many days to shift
             shift_days = shift_dict.get(pid)
             if shift_days is None:
+                # all patients need to have a shift value
                 raise UnknownPatient(sheet_name, pid)
+            shift_delta = pd.Timedelta(days=shift_days)
 
-            for col_name, date_col_idx in date_col_indices.items():
-                cell = ws.cell(row=row_idx, column=date_col_idx)
-                original_value = cell.value
-
-                # skip blank values
-                if str(original_value).strip() == "":
+            # now scan each column
+            # ... even when page has no date_columns; still check for hidden dates
+            for col_idx in range(ws.max_column):
+                # skip the patient id column (it was already checked anyway)
+                if col_idx == patient_id_idx:
                     continue
 
-                # block non-dates in date columns
-                if not isinstance(original_value, datetime | date):
-                    # check if it's one of the non-dates allowed
-                    page_config = sheet_configs[sheet_name]
-                    pass_as_is = page_config.get("pass_as_is", {})
-                    allowed_non_dates = pass_as_is.get(col_name, [])
-                    if (original_value is None) or (
-                        original_value.strip() in allowed_non_dates
-                    ):
-                        continue
+                # get the cell value. replace it with None if it's just whitespace
+                cell = ws.cell(row=row_idx + 1, column=col_idx + 1)
+                cell_value = cell.value
+                if isinstance(cell_value, str):
+                    cell_value = cell_value.strip()
+                    if not cell_value:
+                        cell_value = None
+                        cell.value = None
 
+                # so if the cell is empty; skip the rest of the checks for this cell
+                # ... we go tot he next column in the row
+                if cell_value is None:
+                    continue
+
+                # if there's no column name; this column of the row should be None
+                # ... and we win't reach this line if the cell_value was None
+                col_name = col_names[col_idx]
+                if col_name is None:
+                    raise BlankColumnHasData(sheet_name, row_idx, col_idx, cell_value)
+
+                # skip values in shift_ignore
+                if cell_value in shift_ignore[col_name]:
+                    continue
+
+                # for text columns, we now *just* need to check for a hidden date
+                if col_name in text_columns:
+                    # check for dates in non-date columns
+                    for found in datefinder.find_dates(str(cell_value)):
+                        raise HiddenDate(
+                            sheet_name,
+                            row_idx,
+                            col_idx,
+                            col_name,
+                            cell_value,
+                            found,
+                        )
+                    cell.value = cell_value
+                    continue
+
+                # we've already checked this (sort of)
+                # assert col_name in date_columns
+
+                # cell_value can be str | datetime | date
+                # ... so parsed might not always succeed
+                parsed = _parse._parse_date_value(cell_value)
+                if parsed is None:
+                    # raise an error; we already handled values we should pass as-is
                     raise ShiftFoundNonDate(
-                        sheet_name, row_idx, date_col_idx, col_name, original_value
+                        sheet_name, row_idx, col_idx, col_name, cell_value
                     )
 
-                # original_value is datetime | date
-                # ... so parsed should always succeed
-                parsed = _parse._parse_date_value(original_value)
+                # perform the actual shifting
+                shifted = parsed + shift_delta
 
-                if shift_days is None:
-                    continue
-
-                exc_dates = parsed_exceptions.get(col_name, set())
-                if exc_dates and parsed.date() in exc_dates:
-                    continue
-
-                shifted = parsed + pd.Timedelta(days=shift_days)
-                if isinstance(original_value, date) and not isinstance(
-                    original_value, datetime
-                ):
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
-                else:
+                # controls wether the data is displayed with the 00:00:00 in Excel
+                # ... it might be nice to just drop the time if it's 00:00:00
+                if isinstance(cell_value, datetime):
                     cell.value = cast(Any, shifted.to_pydatetime())
+                else:
+                    cell.value = cast(Any, shifted.to_pydatetime().date())
+                    cell.number_format = "yyyy-mm-dd"
 
-            # check for dates in non-date columns
-            for non_date_col_idx in range(1, 1 + (ws.max_column or 0)):
-                if non_date_col_idx in date_col_indices.values():
-                    continue
-
-                value = str(ws.cell(row=row_idx, column=non_date_col_idx).value)
-                import datefinder
-
-                for found in datefinder.find_dates(value):
-                    raise HiddenDate(
-                        sheet_name, row_idx, non_date_col_idx, value, found
-                    )
+        logger.info(f"Shifting {sheet_name=} processed {row_idx} rows")
 
     wb.save(output_file)
     logger.info("Output written to '%s'", output_file)
