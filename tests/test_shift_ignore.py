@@ -4,7 +4,7 @@ import pytest
 from openpyxl import load_workbook
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import HiddenDate, ShiftFoundNonDate
+from nuh_helper.date_shift import HiddenDate, PatientColumnMissing, ShiftFoundNonDate
 
 
 def test_shift_exceptions(tmp_path: Path) -> None:
@@ -175,7 +175,7 @@ def test_ptid_column_missing(tmp_path: Path) -> None:
             "shift_ignore": {"dob": ["mssing"]},
         },
     }
-    with pytest.raises(NameError) as info:
+    with pytest.raises(PatientColumnMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -188,9 +188,8 @@ def test_ptid_column_missing(tmp_path: Path) -> None:
             linking_table_path=str(linking_table_old),
             linking_table_output=str(linking_table_out),
         )
-    assert str(info.value) == (
-        "patient_id_col='ptid' column not in sheet_name='page-data'"
-    )
+    assert info.value._page_name == "page-data"
+    assert info.value._column_name == "ptid"
 
 
 @pytest.mark.parametrize("shift_ignore", [True, False])

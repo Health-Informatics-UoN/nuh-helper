@@ -113,6 +113,18 @@ class BlankColumnHasData(Exception):
         self._value: any = value
 
 
+class PatientColumnMissing(Exception):
+    """raised when the patient column is missing from any sheet"""
+
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = f"The patient {column_name=} is not present on {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
+
+
 class ExtraColumn(Exception):
     """raised when an unknown column appears in a page we're shifting.
 
@@ -620,7 +632,7 @@ def shift_excel_dates_inplace(
 
         # check to be sure we found the patient_id_col/patient_id_idx
         if patient_id_idx is None:
-            raise NameError(f"{patient_id_col=} column not in {sheet_name=}")
+            raise PatientColumnMissing(sheet_name, patient_id_col)
 
         missing = [col for col in text_columns if col not in col_names]
         if missing:
