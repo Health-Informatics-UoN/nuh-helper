@@ -809,10 +809,7 @@ def patient_shift_deltas(
             else:
                 patient_id_col = col
     if patient_id_col is None:
-        patient_id_col = patient_id_col_name
-        sheet_name = page.name
-        # it's done like this to get the same error message as above
-        raise NameError(f"{patient_id_col=} column not in {sheet_name=}")
+        raise PatientColumnMissing(page.name, patient_id_col_name)
 
     # find the/a list of all ids
     patient_ids = sorted(
