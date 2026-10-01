@@ -5,15 +5,16 @@ Consistently shifts dates for patient IDs across multiple sheets and columns
 in an Excel file, with support for reproducible shifts using a linking table.
 """
 
+import csv
 import logging
+import random
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import datefinder
 import pandas as pd
-from book_page import CSVBook, XLSXBook
-from book_page.book import Page
+from book_page import CSVBook, Page, XLSXBook
 
 from nuh_helper.date_shift import _excel, _parse, mappings
 
@@ -464,15 +465,12 @@ def shift_excel_dates_inplace(
     input_file: str | Path | list[Path],
     output_file: str | Path,
     patient_sheet: str,
-    patient_id_col: str,
     sheet_configs: dict[str, dict[str, Any]],
     min_shift_days: int = -15,
     max_shift_days: int = 15,
     linking_table_path: str | None = None,
     linking_table_output: str | None = None,
     seed: int | None = None,
-    header_row: int = 0,
-    skip_rows: list[int] | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -485,7 +483,6 @@ def shift_excel_dates_inplace(
         input_file: Path to input Excel file.
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
-        patient_id_col: Name of the column containing patient IDs in the patient sheet.
         sheet_configs:
           Dictionary mapping sheet names to configuration dicts, or, the string
             'skip' if that sheet should be skipped but is a valid part of the
@@ -507,8 +504,6 @@ def shift_excel_dates_inplace(
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
-        patient_header_row: Zero-based header row index for the patient sheet (default: 0).
-        patient_skip_rows: Optional zero-based row indices to exclude from patient data.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
@@ -523,31 +518,28 @@ def shift_excel_dates_inplace(
     else:
         book: CSVBook = CSVBook.copy(input_file, output_file)
 
-    _patient_ids, shift_mappings = _get_patient_ids_and_shift_mappings(
-        input_file=book,
-        patient_sheet=patient_sheet,
-        patient_id_col=patient_id_col,
-        sheet_configs=sheet_configs,
-        min_shift_days=min_shift_days,
-        max_shift_days=max_shift_days,
-        linking_table_path=linking_table_path,
-        seed=seed,
-        patient_header_row=header_row,
-        patient_skip_rows=skip_rows,
-    )
+    ## ###
+    ## double check that the parameters match what's in the sheet config
 
-    shift_dict: dict[str, int] = dict(
-        zip(
-            shift_mappings["patient_id"],
-            shift_mappings["shift_days"],
-            strict=True,
+    assert patient_sheet in sheet_configs
+
+    with book[patient_sheet] as page:
+        shift_deltas = patient_shift_deltas(
+            page,
+            linking_table_path,
+            linking_table_output or "shift_mappings.csv",
+            sheet_configs[patient_sheet]["patient_id_col"],
+            sheet_configs[patient_sheet]["header_row"],
+            sheet_configs[patient_sheet].get("skip_rows", []),
+            seed,
+            min_shift_days,
+            max_shift_days,
         )
-    )
 
     # check for sheets we didn't have an explanation for
-    for sheet_name in book:
-        if sheet_name not in sheet_configs:
-            raise ExtraPage(sheet_name)
+    for page in book:
+        if page.name not in sheet_configs:
+            raise ExtraPage(page.name)
 
     # start looping through each sheet in the configuration
     for sheet_name, sheet_config in sheet_configs.items():
@@ -567,18 +559,14 @@ def shift_excel_dates_inplace(
         # these will raise errors if the keys are missing - that's fine
         with book[sheet_name] as page:
             function_that_preserves_indentation(
-                shift_dict, sheet_name, sheet_config, page
+                shift_deltas, sheet_name, sheet_config, page
             )
 
     logger.info("Output written to '%s'", output_file)
 
-    linking_path = linking_table_output or "shift_mappings.csv"
-    shift_mappings.to_csv(linking_path, index=False)
-    logger.info("Linking table saved to '%s'", linking_path)
-
 
 def function_that_preserves_indentation(
-    shift_dict: dict[str, pd.Timedelta],
+    shift_deltas: dict[str, pd.Timedelta],
     sheet_name: str,
     sheet_config: dict[str, any],
     page: Page,
@@ -731,11 +719,10 @@ def function_that_preserves_indentation(
                 continue
 
             # determine how many days to shift
-            shift_days = shift_dict.get(pid)
-            if shift_days is None:
+            shift_delta = shift_deltas.get(pid)
+            if shift_delta is None:
                 # all patients need to have a shift value
                 raise UnknownPatient(sheet_name, pid)
-            shift_delta = pd.Timedelta(days=shift_days)
 
             # now scan each column
             # ... even when page has no date_columns; still check for hidden dates
@@ -807,6 +794,90 @@ def function_that_preserves_indentation(
                     cell.number_format = "yyyy-mm-dd"
 
         logger.info(f"Shifting {sheet_name=} processed {row_idx} rows")
+
+
+def patient_shift_deltas(
+    page: Page,
+    src_linking_table: str | Path,
+    out_linking_table: str | Path,
+    patient_id_col_name: str,
+    patient_header_row: int,
+    patient_skip_rows: list[int] | None,
+    seed: int | None,
+    min_shift_days: int,
+    max_shift_days: int,
+) -> dict[str, pd.Timedelta]:
+    # find the patient id index
+    patient_id_col: None | int = None
+    for col in range(page.columns):
+        if page[patient_header_row, col].value == patient_id_col_name:
+            if patient_id_col is not None:
+                raise RuntimeError(f"multiple columns with {patient_id_col_name=}")
+            else:
+                patient_id_col = col
+    if patient_id_col is None:
+        patient_id_col = patient_id_col_name
+        sheet_name = page.name
+        # it's done like this to get the same error message as above
+        raise NameError(f"{patient_id_col=} column not in {sheet_name=}")
+
+    # find the/a list of all ids
+    patient_ids = sorted(
+        _parse._normalize_patient_id(patient_id)
+        for patient_id in [
+            page[row, patient_id_col].value.strip()
+            for row in range(
+                max(
+                    [patient_header_row]
+                    + (patient_skip_rows if patient_skip_rows is not None else [])
+                )
+                + 1,
+                page.rows,
+            )
+        ]
+        if patient_id
+    )
+    logger.info(f"Found {len(patient_ids)=} in {page.name=}")
+
+    # load the old ids (should we remove IDs that are "gone"?)
+    if isinstance(src_linking_table, str):
+        src_linking_table = Path(src_linking_table)
+    if not src_linking_table.is_file():
+        old_mappings: dict[str, int] = {}
+    else:
+        with open(src_linking_table) as file:
+            old_mappings: dict[str, int] = {
+                _parse._normalize_patient_id(row[0]): int(row[1])
+                for row in csv.reader(file)
+                if row and row[1] and row[1].strip() != "shift_days"
+                # if row and row[0] and row[0].strip() != "patient_id"
+            }
+    logger.info(f"Loaded {len(old_mappings)=} in {src_linking_table =}")
+
+    # create the list of all mappings
+
+    if seed:
+        random.seed(seed)
+    all_mappings: dict[str, int] = {
+        id: (
+            old_mappings[id]
+            if id in old_mappings
+            else random.randint(min_shift_days, max_shift_days)
+        )
+        for id in patient_ids
+    }
+    removed = len([k for k in all_mappings if k not in patient_ids])
+    logger.info(f"Total of {len(all_mappings)} patient(s) (... and {removed=})")
+
+    # store all mappings in the out file
+    with open(out_linking_table, "w") as file:
+        csv.writer(file).writerows(
+            [["patient_id", "shift_days"]]
+            + [[key, all_mappings[key]] for key in sorted(all_mappings)]
+        )
+    logger.info(f"Saved mappings {out_linking_table}")
+
+    return {k: pd.Timedelta(days=all_mappings[k]) for k in all_mappings}
 
 
 # Re-export public API

@@ -17,7 +17,7 @@ exclude-newer-span = "P7D"
 [[package]]
 name = "book-page"
 version = "0.1.0"
-source = { git = "https://github.com/peterlavalle/book_page.git#15e9f9cb09cc69a2ba74cebc8a921d77ddd56b41" }
+source = { git = "https://github.com/peterlavalle/book_page.git#3243604f4d7d3dcae9bf39852aa9b5787dce3052" }
 dependencies = [
     { name = "openpyxl" },
 ]
