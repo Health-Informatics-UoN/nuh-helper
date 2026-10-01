@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import datefinder
 import pandas as pd
-from book_page import CSVBook, Page, XLSXBook
+from book_page import Book, Page, book_copy
 
 from nuh_helper.date_shift import _excel, _parse, mappings
 
@@ -159,7 +159,7 @@ class ExtraPage(Exception):
 
 
 def _get_patient_ids_and_shift_mappings(
-    input_file: XLSXBook | CSVBook,
+    input_file: Path,
     patient_sheet: str,
     patient_id_col: str,
     sheet_configs: dict[str, dict[str, Any]],
@@ -513,15 +513,10 @@ def shift_excel_dates_inplace(
         seed,
     )
 
-    if str(input_file).endswith(".xlsx"):
-        book: XLSXBook = XLSXBook.copy(input_file, output_file)
-    else:
-        book: CSVBook = CSVBook.copy(input_file, output_file)
+    book: Book = book_copy(input_file, output_file)
 
-    ## ###
-    ## double check that the parameters match what's in the sheet config
-
-    assert patient_sheet in sheet_configs
+    if patient_sheet not in sheet_configs:
+        raise PageMissing(patient_sheet)
 
     with book[patient_sheet] as page:
         shift_deltas = patient_shift_deltas(
@@ -556,22 +551,20 @@ def shift_excel_dates_inplace(
             continue
         logger.info(f"Shifting {sheet_name=}")
 
-        # these will raise errors if the keys are missing - that's fine
-        with book[sheet_name] as page:
-            function_that_preserves_indentation(
-                shift_deltas, sheet_name, sheet_config, page
-            )
+        # shift the page
+        _shift_book_page(shift_deltas, sheet_name, sheet_config, book)
 
     logger.info("Output written to '%s'", output_file)
 
 
-def function_that_preserves_indentation(
+def _shift_book_page(
     shift_deltas: dict[str, pd.Timedelta],
     sheet_name: str,
     sheet_config: dict[str, any],
-    page: Page,
+    book: Book,
 ) -> None:
-    if True:
+    """shifts a single page. the nesting/breakout was done to minimize git changes"""
+    with book[sheet_name] as page:
         patient_id_col: str = cast(str, sheet_config["patient_id_col"]).strip()
         date_columns: list[str] = [col.strip() for col in sheet_config["date_columns"]]
         text_columns: list[str] = [col.strip() for col in sheet_config["text_columns"]]
