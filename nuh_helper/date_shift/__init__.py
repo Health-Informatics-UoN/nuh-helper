@@ -822,21 +822,29 @@ def patient_shift_deltas(
     logger.info(f"patient_shift_deltas() ; {patient_id_col=}")
 
     # find the/a list of all ids
-    patient_ids = sorted(
-        _parse._normalize_patient_id(patient_id)
-        for patient_id in [
-            page[row, patient_id_col].value.strip()
-            for row in range(
-                max(
-                    [patient_header_row]
-                    + (patient_skip_rows if patient_skip_rows is not None else [])
-                )
-                + 1,
-                page.rows,
-            )
-        ]
-        if patient_id
+    patient_ids = []
+    first_row = (
+        max(
+            [patient_header_row]
+            + (patient_skip_rows if patient_skip_rows is not None else [])
+        )
+        + 1
     )
+    logger.info(f"patient_shift_deltas() ; {first_row=}")
+
+    for row in range(
+        first_row,
+        page.rows,
+    ):
+        patient_id = page[row, patient_id_col].value
+        if not patient_id:
+            continue
+        patient_id = _parse._normalize_patient_id(patient_id.strip())
+        if patient_id in patient_ids:
+            continue
+        patient_ids.append(patient_id)
+        if (len(patient_ids) % 40) == 0:
+            logger.info(f"patient_shift_deltas() ; so far {len(patient_ids)=}")
     logger.info(f"patient_shift_deltas() ; Found {len(patient_ids)=} in {page.name=}")
 
     # load the old ids (should we remove IDs that are "gone"?)
