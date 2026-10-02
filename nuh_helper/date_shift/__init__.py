@@ -808,6 +808,7 @@ def patient_shift_deltas(
     min_shift_days: int,
     max_shift_days: int,
 ) -> dict[str, pd.Timedelta]:
+    logger.info("patient_shift_deltas() ;preparing per-patient shifts")
     # find the patient id index
     patient_id_col: None | int = None
     for col in range(page.columns):
@@ -818,6 +819,7 @@ def patient_shift_deltas(
                 patient_id_col = col
     if patient_id_col is None:
         raise PatientColumnMissing(page.name, patient_id_col_name)
+    logger.info(f"patient_shift_deltas() ; {patient_id_col=}")
 
     # find the/a list of all ids
     patient_ids = sorted(
@@ -835,7 +837,7 @@ def patient_shift_deltas(
         ]
         if patient_id
     )
-    logger.info(f"Found {len(patient_ids)=} in {page.name=}")
+    logger.info(f"patient_shift_deltas() ; Found {len(patient_ids)=} in {page.name=}")
 
     # load the old ids (should we remove IDs that are "gone"?)
     if isinstance(src_linking_table, str):
@@ -850,7 +852,9 @@ def patient_shift_deltas(
                 if row and row[1] and row[1].strip() != "shift_days"
                 # if row and row[0] and row[0].strip() != "patient_id"
             }
-    logger.info(f"Loaded {len(old_mappings)=} in {src_linking_table =}")
+    logger.info(
+        f"patient_shift_deltas() ; Loaded {len(old_mappings)=} in {src_linking_table =}"
+    )
 
     # create the list of all mappings
 
@@ -865,7 +869,9 @@ def patient_shift_deltas(
         for id in patient_ids
     }
     removed = len([k for k in all_mappings if k not in patient_ids])
-    logger.info(f"Total of {len(all_mappings)} patient(s) (... and {removed=})")
+    logger.info(
+        f"patient_shift_deltas() ; {len(all_mappings)=} patient(s) (... and {removed=})"
+    )
 
     # store all mappings in the out file
     with open(out_linking_table, "w") as file:
@@ -873,7 +879,7 @@ def patient_shift_deltas(
             [["patient_id", "shift_days"]]
             + [[key, all_mappings[key]] for key in sorted(all_mappings)]
         )
-    logger.info(f"Saved mappings {out_linking_table}")
+    logger.info(f"patient_shift_deltas() ; Saved mappings {out_linking_table}")
 
     return {k: pd.Timedelta(days=all_mappings[k]) for k in all_mappings}
 
