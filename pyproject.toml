@@ -9,8 +9,10 @@ dependencies = [
     "pandas>=3.0.5",
     "openpyxl>=3.1.0",
     "datefinder>=1.0.0",
-    "book-page",
+    "book_page @ git+https://github.com/peterlavalle/book_page.git@main",
 ]
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
