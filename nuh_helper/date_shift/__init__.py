@@ -505,7 +505,13 @@ def shift_excel_dates_inplace(
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
     """  # noqa: E501
-    logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
+    logger.info(
+        "Shifting dates in-place: '%s' → '%s'",
+        input_file
+        if not isinstance(input_file, list)
+        else [file.name for file in input_file],
+        output_file,
+    )
     logger.debug(
         "Shift range: %d to %d days, seed=%s",
         min_shift_days,
@@ -514,6 +520,7 @@ def shift_excel_dates_inplace(
     )
 
     book: Book = book_copy(input_file, output_file)
+    logger.info(f"Book has {type(book)=}")
 
     if patient_sheet not in sheet_configs:
         raise PageMissing(patient_sheet)
@@ -530,6 +537,7 @@ def shift_excel_dates_inplace(
             min_shift_days,
             max_shift_days,
         )
+    logger.info(f"loaded deltas {len(shift_deltas)=}")
 
     # check for sheets we didn't have an explanation for
     for page in book:
