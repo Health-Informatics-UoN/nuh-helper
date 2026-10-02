@@ -839,7 +839,8 @@ def patient_shift_deltas(
         patient_id = page[row, patient_id_col].value
         if not patient_id:
             continue
-        patient_id = _parse._normalize_patient_id(patient_id.strip())
+        # patient_id = _parse._normalize_patient_id(patient_id.strip())
+        patient_id = patient_id.strip()
         if patient_id in patient_ids:
             continue
         patient_ids.append(patient_id)
