@@ -288,7 +288,7 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         "page-data": "skip",
     }
 
-    def body() -> None:
+    def body(shift_ignore_yaml: None | Path) -> None:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -299,12 +299,12 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
             seed=14333,
             linking_table_path=str(linking_table_old),
             linking_table_output=str(linking_table_out),
+            shift_ignore_yaml=shift_ignore_yaml,
         )
 
     if not shift_ignore:
-        print(output_path)
         with pytest.raises(HiddenDate) as info:
-            body()
+            body(None)
         assert str(info.value._message) == (
             "hidden date in [sheet_name='page-desc', 2, 2 @ glitter] "
             + 'value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
@@ -314,6 +314,7 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
 
     else:
         # add the exception
+
         sheet_configs["page-desc"]["shift_ignore"] = {
             "glitter": [
                 "can't recall the date but on 12/11/2001 they had an itchy tummy",
@@ -324,7 +325,7 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         }
 
         # run the shift
-        body()
+        body(source_file)
 
         workbook = load_workbook(output_path)
         page = workbook["page-desc"]
@@ -349,3 +350,48 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         ]
 
         assert expected == obtained
+
+
+def test_move_to_file(tmp_path: Path) -> None:
+
+    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": {
+            "patient_id_col": "pid",
+            "date_columns": [],
+            "text_columns": ["foo", "glitter"],
+            "header_row": 0,
+            "skip_rows_after_header": [],
+        },
+        "page-data": "skip",
+    }
+
+    # add the old config we want to remove
+    sheet_configs["page-desc"]["shift_ignore"] = {
+        "glitter": [
+            "can't recall the date but on 12/11/2001 they had an itchy tummy",
+        ],
+        "foo": [
+            "agreed on 21st jul 2017",
+        ],
+    }
+
+    with pytest.raises(RuntimeError) as error:
+        shift_excel_dates_inplace(
+            input_file=str(source_file),
+            output_file=str(output_path),
+            patient_sheet="page-desc",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+        pytest.fail("execution should throw an exception before now")
+
+    assert str(error.value) == "move shift_ignore from sheet_configs to a file"
