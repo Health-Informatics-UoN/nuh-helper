@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import datefinder
 import pandas as pd
+import yaml
 from book_page import Book, Page, book_copy
 
 from nuh_helper.date_shift import _excel, _parse, mappings
@@ -196,9 +197,7 @@ def _get_patient_ids_and_shift_mappings(
         skip_rows_after_header=effective_patient_skip_rows,
     )
     if patient_id_col not in patient_df.columns:
-        raise ValueError(
-            f"Patient ID column '{patient_id_col}' not found in sheet '{patient_sheet}'"
-        )
+        raise PatientColumnMissing(patient_sheet, patient_id_col)
 
     patient_ids = (
         patient_df[patient_id_col]
@@ -472,6 +471,7 @@ def shift_excel_dates_inplace(
     linking_table_path: str | None = None,
     linking_table_output: str | None = None,
     seed: int | None = None,
+    shift_ignore_yaml: None | str | Path = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -497,14 +497,17 @@ def shift_excel_dates_inplace(
           - 'skip_rows_after_header': list of zero-based row indices to
             exclude from data (e.g. a data-type row immediately below the
             header)
-          - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to
-                lists of values that are passed as-is with no manipulation or
-                checking.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
+        shift_ignore_yaml:
+            path to a .yaml file holding `page:{column:[values]}` lists of cell
+            values that're ignored and passed as-is with no manipulation. None
+            and "" are always added, and all values will be .strip()
+
+        (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
     """  # noqa: E501
     logger.info(
         "Shifting dates in-place: '%s' → '%s'",
@@ -522,6 +525,35 @@ def shift_excel_dates_inplace(
 
     book: Book = book_copy(input_file, output_file)
     logger.info(f"Book has {type(book)=}")
+    # TODO; it'd be cool to "normalize" the linking_table_path/linking_table_output here
+
+    # get the shift_ignore: dict[str, dict[str, list[str]]] from shift_ignore_yaml: Path
+    if not shift_ignore_yaml:
+        if linking_table_path:
+            shift_ignore_yaml = (
+                Path(linking_table_path).parent / "shift_ignore.do-not-commit.yaml"
+            )
+        else:
+            raise RuntimeError(
+                "can't guess shift_ignore_yaml without linking_table_path"
+            )
+    elif not isinstance(shift_ignore_yaml, Path):
+        shift_ignore_yaml = Path(shift_ignore_yaml)
+
+    if not shift_ignore_yaml.is_file():
+        shift_ignore: dict[str, dict[str, set[str]]] = {}
+        logger.warning(f"didn't find shift_ignore file {shift_ignore_yaml=}")
+    else:
+        with open(shift_ignore_yaml) as file:
+            data = yaml.safe_load(file)
+            shift_ignore: dict[str, dict[str, list[str]]] = {
+                page.strip(): {
+                    col.strip(): [ignored.strip() for ignored in data[page][col]]
+                    + ["", None]
+                    for col in data[page]
+                }
+                for page in data
+            }
 
     if patient_sheet not in sheet_configs:
         raise PageMissing(patient_sheet)
@@ -561,12 +593,13 @@ def shift_excel_dates_inplace(
         logger.info(f"Shifting {sheet_name=}")
 
         # shift the page
-        _shift_book_page(shift_deltas, sheet_name, sheet_config, book)
+        _shift_book_page(shift_ignore, shift_deltas, sheet_name, sheet_config, book)
 
     logger.info("Output written to '%s'", output_file)
 
 
 def _shift_book_page(
+    shift_ignore: dict[str, dict[str, set[str]]],
     shift_deltas: dict[str, pd.Timedelta],
     sheet_name: str,
     sheet_config: dict[str, any],
@@ -646,15 +679,6 @@ def _shift_book_page(
         missing = [col for col in date_columns if col not in col_names]
         if missing:
             raise DateColumnsMissing(sheet_name, missing)
-
-        # map and strip the shift_ignore values
-        shift_ignore = {
-            col_name: [
-                ignore.strip()
-                for ignore in sheet_config.get("shift_ignore", {}).get(col_name, [])
-            ]
-            for col_name in col_names
-        }
 
         ###
         # process each row of the workbook
@@ -754,13 +778,29 @@ def _shift_book_page(
                     raise BlankColumnHasData(sheet_name, row_idx, col_idx, cell_value)
 
                 # skip values in shift_ignore
-                if cell_value in shift_ignore[col_name]:
+                if "shift_ignore" in sheet_config:
+                    raise RuntimeError("move shift_ignore from sheet_configs to a file")
+                if sheet_name not in shift_ignore:
+                    shift_ignore[sheet_name] = {}
+                if col_name not in shift_ignore[sheet_name]:
+                    shift_ignore[sheet_name][col_name] = {None, ""}
+                if cell_value in shift_ignore[sheet_name][col_name]:
                     continue
 
                 # for text columns, we now *just* need to check for a hidden date
                 if col_name in text_columns:
                     # check for dates in non-date columns
                     for found in datefinder.find_dates(str(cell_value)):
+                        logger.debug(
+                            f"found hidden date {sheet_name=}/{col_name=}:{cell_value}"
+                        )
+                        ignored = shift_ignore[sheet_name][col_name]
+                        logger.debug(
+                            f"shift_ignore[{sheet_name=}][{col_name=}]= {len(ignored)}"
+                        )
+                        for ig in ignored:
+                            logger.debug(f"- {ig}")
+
                         raise HiddenDate(
                             sheet_name,
                             row_idx,
@@ -809,6 +849,7 @@ def patient_shift_deltas(
     min_shift_days: int,
     max_shift_days: int,
 ) -> dict[str, pd.Timedelta]:
+
     logger.info("patient_shift_deltas() ;preparing per-patient shifts")
     # find the patient id index
     patient_id_col: None | int = None
