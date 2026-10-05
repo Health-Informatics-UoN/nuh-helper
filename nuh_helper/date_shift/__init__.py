@@ -195,9 +195,7 @@ def _get_patient_ids_and_shift_mappings(
         skip_rows_after_header=effective_patient_skip_rows,
     )
     if patient_id_col not in patient_df.columns:
-        raise ValueError(
-            f"Patient ID column '{patient_id_col}' not found in sheet '{patient_sheet}'"
-        )
+        raise PatientColumnMissing(patient_sheet, patient_id_col)
 
     patient_ids = (
         patient_df[patient_id_col]
@@ -465,15 +463,12 @@ def shift_excel_dates_inplace(
     input_file: str,
     output_file: str,
     patient_sheet: str,
-    patient_id_col: str,
     sheet_configs: dict[str, dict[str, Any]],
     min_shift_days: int = -15,
     max_shift_days: int = 15,
     linking_table_path: str | None = None,
     linking_table_output: str | None = None,
     seed: int | None = None,
-    header_row: int = 0,
-    skip_rows: list[int] | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -518,6 +513,17 @@ def shift_excel_dates_inplace(
         max_shift_days,
         seed,
     )
+
+    # read some parameters from the config (rather than asking for them in the invoke)
+    if patient_sheet not in sheet_configs:
+        raise ValueError(f"{patient_sheet=}")
+    patient_id_col: str = sheet_configs[patient_sheet]["patient_id_col"]
+    header_row: int = sheet_configs[patient_sheet].get("header_row", 0)
+    skip_rows: list[int] = sheet_configs[patient_sheet].get(
+        "skip_rows_after_header", []
+    )
+    if not skip_rows:
+        skip_rows = []
 
     shutil.copy2(input_file, output_file)
 
