@@ -107,6 +107,8 @@ shift_excel_dates(
 
 If your workbook has rich formatting (cell styles, column widths, conditional formatting, etc.) use `shift_excel_dates_inplace` instead. It copies the input file and modifies date cells directly via openpyxl, so all formatting is preserved exactly.
 
+> `shift_excel_dates_inplace()` gets the `patient_id_col` and other `patient_sheet` values from the `sheet_config` rather than duplicate the configuration in the function call
+
 ```python
 from nuh_helper import shift_excel_dates_inplace
 
@@ -114,7 +116,6 @@ shift_excel_dates_inplace(
     input_file="input.xlsx",
     output_file="output.xlsx",
     patient_sheet="patients",
-    patient_id_col="patient_id",
     sheet_configs=sheet_configs,
     seed=42,
     linking_table_output="shift_mappings.csv",
