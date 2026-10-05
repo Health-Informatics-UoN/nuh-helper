@@ -777,6 +777,8 @@ def shift_excel_dates_inplace(
                     raise BlankColumnHasData(sheet_name, row_idx, col_idx, cell_value)
 
                 # skip values in shift_ignore
+                if "shift_ignore" in sheet_config:
+                    raise RuntimeError("move shift_ignore from sheet_configs to a file")
                 if sheet_name not in shift_ignore:
                     shift_ignore[sheet_name] = {}
                 if col_name not in shift_ignore[sheet_name]:
