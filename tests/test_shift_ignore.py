@@ -206,7 +206,7 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
         },
     }
 
-    def body() -> None:
+    def body(shift_ignore_yaml: None | Path) -> None:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -217,11 +217,12 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
             seed=14333,
             linking_table_path=str(linking_table_old),
             linking_table_output=str(linking_table_out),
+            shift_ignore_yaml=shift_ignore_yaml,
         )
 
     if not shift_ignore:
         with pytest.raises(ShiftFoundNonDate) as info:
-            body()
+            body(None)
         assert info.value._page == "page-data"
         assert info.value._row == 5
         assert info.value._col == 1
@@ -229,8 +230,7 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
         assert info.value._value == "mssing"
         return
     else:
-        sheet_configs["page-data"]["shift_ignore"] = {"dob": ["mssing"]}
-        body()
+        body(source_file.parent / "shift-ignore.yaml")
 
     workbook = load_workbook(output_path)
 
@@ -313,19 +313,8 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         return
 
     else:
-        # add the exception
-
-        sheet_configs["page-desc"]["shift_ignore"] = {
-            "glitter": [
-                "can't recall the date but on 12/11/2001 they had an itchy tummy",
-            ],
-            "foo": [
-                "agreed on 21st jul 2017",
-            ],
-        }
-
         # run the shift
-        body(source_file)
+        body(source_file.parent / "shift-ignore.yaml")
 
         workbook = load_workbook(output_path)
         page = workbook["page-desc"]
