@@ -481,7 +481,6 @@ def shift_excel_dates_inplace(
         input_file: Path to input Excel file.
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
-        patient_id_col: Name of the column containing patient IDs in the patient sheet.
         sheet_configs:
           Dictionary mapping sheet names to configuration dicts, or, the string
             'skip' if that sheet should be skipped but is a valid part of the
@@ -503,8 +502,6 @@ def shift_excel_dates_inplace(
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
-        patient_header_row: Zero-based header row index for the patient sheet (default: 0).
-        patient_skip_rows: Optional zero-based row indices to exclude from patient data.
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
