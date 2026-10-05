@@ -16,7 +16,7 @@ from typing import Any, cast
 import datefinder
 import pandas as pd
 import yaml
-from book_page import Book, Page, book_copy
+from book_page import Book, Page, book_open
 
 from nuh_helper.date_shift import _excel, _parse, mappings
 
@@ -523,7 +523,7 @@ def shift_excel_dates_inplace(
         seed,
     )
 
-    book: Book = book_copy(input_file, output_file)
+    book: Book = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
     # TODO; it'd be cool to "normalize" the linking_table_path/linking_table_output here
 
@@ -571,6 +571,8 @@ def shift_excel_dates_inplace(
             max_shift_days,
         )
     logger.info(f"loaded deltas {len(shift_deltas)=}")
+
+    raise Exception("?? update teh rest")
 
     # check for sheets we didn't have an explanation for
     for page in book:
@@ -850,48 +852,36 @@ def patient_shift_deltas(
     max_shift_days: int,
 ) -> dict[str, pd.Timedelta]:
 
-    logger.info("patient_shift_deltas() ;preparing per-patient shifts")
+    logger.info("patient_shift_deltas() ; preparing per-patient shifts")
+
     # find the patient id index
     patient_id_col: None | int = None
-    for col in range(page.columns):
-        if page[patient_header_row, col].value == patient_id_col_name:
-            if patient_id_col is not None:
-                raise RuntimeError(f"multiple columns with {patient_id_col_name=}")
-            else:
-                patient_id_col = col
-    if patient_id_col is None:
-        raise PatientColumnMissing(page.name, patient_id_col_name)
-    logger.info(f"patient_shift_deltas() ; {patient_id_col=}")
-
-    # find the/a list of all ids
     patient_ids = []
     start = time.time()
-    first_row = (
-        max(
-            [patient_header_row]
-            + (patient_skip_rows if patient_skip_rows is not None else [])
-        )
-        + 1
-    )
-    logger.info(f"patient_shift_deltas() ; {first_row=}")
 
-    for row in range(
-        first_row,
-        page.rows,
-    ):
-        patient_id = page[row, patient_id_col].value
-        if not patient_id:
+    for row, data in page.stream_rows():
+        if row < patient_header_row or row in patient_skip_rows:
             continue
-        patient_id = _parse._normalize_patient_id(patient_id.strip())
-        if patient_id in patient_ids:
-            continue
-        patient_ids.append(patient_id)
-        if (len(patient_ids) % 40) == 0:
-            seconds = time.time() - start
-            logger.info(
-                f"patient_shift_deltas() ; so far {len(patient_ids)=} in {seconds=}"
-            )
+        elif row == patient_header_row:
+            patient_id_col = data.index(patient_id_col_name)
+            if patient_id_col is None:
+                raise PatientColumnMissing(page.name, patient_id_col_name)
+        else:
+            patient_id = data[patient_id_col]
+            if not patient_id:
+                continue
+            patient_id = _parse._normalize_patient_id(patient_id.strip())
+            if patient_id in patient_ids:
+                continue
+            patient_ids.append(patient_id)
+            if (len(patient_ids) % 40) == 0:
+                seconds = time.time() - start
+                logger.info(
+                    f"patient_shift_deltas() ; so far {len(patient_ids)=} in {seconds=}"
+                )
     logger.info(f"patient_shift_deltas() ; Found {len(patient_ids)=} in {page.name=}")
+
+    raise Exception("TODO ; update the rest of this")
 
     # load the old ids (should we remove IDs that are "gone"?)
     if isinstance(src_linking_table, str):
