@@ -533,13 +533,14 @@ def shift_excel_dates_inplace(
 
     if not shift_ignore_yaml.is_file():
         shift_ignore: dict[str, dict[str, set[str]]] = {}
+        logger.warning(f"didn't find shift_ignore file {shift_ignore_yaml=}")
     else:
         with open(shift_ignore_yaml) as file:
             data = yaml.safe_load(file)
             shift_ignore: dict[str, dict[str, list[str]]] = {
                 page.strip(): {
-                    col.strip(): {ignored.strip for ignored in data[page][col]}
-                    + {"", None}
+                    col.strip(): [ignored.strip() for ignored in data[page][col]]
+                    + ["", None]
                     for col in data[page]
                 }
                 for page in data
@@ -790,6 +791,16 @@ def shift_excel_dates_inplace(
                 if col_name in text_columns:
                     # check for dates in non-date columns
                     for found in datefinder.find_dates(str(cell_value)):
+                        logger.debug(
+                            f"found hidden date {sheet_name=}/{col_name=}:{cell_value}"
+                        )
+                        ignored = shift_ignore[sheet_name][col_name]
+                        logger.debug(
+                            f"shift_ignore[{sheet_name=}][{col_name=}]= {len(ignored)}"
+                        )
+                        for ig in ignored:
+                            logger.debug(f"- {ig}")
+
                         raise HiddenDate(
                             sheet_name,
                             row_idx,
