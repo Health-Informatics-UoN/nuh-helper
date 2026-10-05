@@ -23,3 +23,4 @@ tests/output/
 *.jsonl.tar.gz
 
 .DS_Store
+.coverage
