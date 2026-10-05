@@ -39,7 +39,6 @@ def test_missing_id(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="patients",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
