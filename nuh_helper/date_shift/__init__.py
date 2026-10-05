@@ -13,6 +13,7 @@ from typing import Any, cast
 
 import datefinder
 import pandas as pd
+import yaml
 from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -469,6 +470,7 @@ def shift_excel_dates_inplace(
     linking_table_path: str | None = None,
     linking_table_output: str | None = None,
     seed: int | None = None,
+    shift_ignore_yaml: None | str | Path = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -494,14 +496,17 @@ def shift_excel_dates_inplace(
           - 'skip_rows_after_header': list of zero-based row indices to
             exclude from data (e.g. a data-type row immediately below the
             header)
-          - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to
-                lists of values that are passed as-is with no manipulation or
-                checking.
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
         linking_table_path: Optional path to existing linking table CSV for reproducibility.
         linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
+        shift_ignore_yaml:
+            path to a .yaml file holding `page:{column:[values]}` lists of cell
+            values that're ignored and passed as-is with no manipulation. None
+            and "" are always added, and all values will be .strip()
+
+        (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
     """  # noqa: E501
     logger.info("Shifting dates in-place: '%s' → '%s'", input_file, output_file)
     logger.debug(
@@ -510,6 +515,35 @@ def shift_excel_dates_inplace(
         max_shift_days,
         seed,
     )
+
+    # TODO; it'd be cool to "normalize" the linking_table_path/linking_table_output here
+
+    # get the shift_ignore: dict[str, dict[str, list[str]]] from shift_ignore_yaml: Path
+    if not shift_ignore_yaml:
+        if linking_table_path:
+            shift_ignore_yaml = (
+                Path(linking_table_path).parent / "shift_ignore.do-not-commit.yaml"
+            )
+        else:
+            raise RuntimeError(
+                "can't guess shift_ignore_yaml without linking_table_path"
+            )
+    elif not isinstance(shift_ignore_yaml, Path):
+        shift_ignore_yaml = Path(shift_ignore_yaml)
+
+    if not shift_ignore_yaml.is_file():
+        shift_ignore: dict[str, dict[str, set[str]]] = {}
+    else:
+        with open(shift_ignore_yaml) as file:
+            data = yaml.safe_load(file)
+            shift_ignore: dict[str, dict[str, list[str]]] = {
+                page.strip(): {
+                    col.strip(): {ignored.strip for ignored in data[page][col]}
+                    + {"", None}
+                    for col in data[page]
+                }
+                for page in data
+            }
 
     # read some parameters from the config (rather than asking for them in the invoke)
     if patient_sheet not in sheet_configs:
@@ -644,15 +678,6 @@ def shift_excel_dates_inplace(
         if missing:
             raise DateColumnsMissing(sheet_name, missing)
 
-        # map and strip the shift_ignore values
-        shift_ignore = {
-            col_name: [
-                ignore.strip()
-                for ignore in sheet_config.get("shift_ignore", {}).get(col_name, [])
-            ]
-            for col_name in col_names
-        }
-
         ###
         # process each row of the workbook
         ##
@@ -752,7 +777,11 @@ def shift_excel_dates_inplace(
                     raise BlankColumnHasData(sheet_name, row_idx, col_idx, cell_value)
 
                 # skip values in shift_ignore
-                if cell_value in shift_ignore[col_name]:
+                if sheet_name not in shift_ignore:
+                    shift_ignore[sheet_name] = {}
+                if col_name not in shift_ignore[sheet_name]:
+                    shift_ignore[sheet_name][col_name] = {None, ""}
+                if cell_value in shift_ignore[sheet_name][col_name]:
                     continue
 
                 # for text columns, we now *just* need to check for a hidden date
