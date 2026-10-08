@@ -572,134 +572,138 @@ def shift_excel_dates_inplace(
         )
     logger.info(f"loaded deltas {len(shift_deltas)=}")
 
-    raise Exception("?? update teh rest")
-
-    # check for sheets we didn't have an explanation for
-    for page in book:
-        if page.name not in sheet_configs:
-            raise ExtraPage(page.name)
-
-    # start looping through each sheet in the configuration
-    for sheet_name, sheet_config in sheet_configs.items():
-        ###
-        # load the workbook sheet and configuration
-        ##
-
+    # check for missing sheets
+    for sheet_name in sheet_configs:
         if sheet_name not in book:
             raise PageMissing(sheet_name)
 
-        if isinstance(sheet_config, str) and sheet_config == "skip":
-            # it's a skipped sheet
-            logger.info(f"Skipping {sheet_name=}")
+    last_name = None
+    row_idx = None
+    for sheet_name, row, cells in book.stream_copy(output_file):
+        assert isinstance(sheet_name, str)
+        if row == 0:
+            if last_name and row_idx:
+                logger.info(f"Shifting {last_name=} processed {row_idx} rows")
+            last_name = sheet_name
+
+            # check that it's in the configs
+            if sheet_name not in sheet_configs:
+                raise ExtraPage(sheet_name)
+
+            sheet_config: dict | str = sheet_configs[sheet_name]
+
+            # do nothing to the skipped ones
+            if sheet_config == "skip":
+                continue
+
+            # grab the configuration
+            patient_id_col: str = cast(str, sheet_config["patient_id_col"]).strip()
+            date_columns: list[str] = [
+                col.strip() for col in sheet_config["date_columns"]
+            ]
+            text_columns: list[str] = [
+                col.strip() for col in sheet_config["text_columns"]
+            ]
+
+            header_row: int = cast(int, sheet_config.get("header_row", 0))
+            skip_rows: list[int] = sheet_config.get("skip_rows_after_header", [])
+
+            ###
+            # do some checks of the configuration
+            ##
+
+            # this is an old field i want to be careful about skipping
+            if "shift_exceptions" in sheet_config:
+                raise RuntimeError(
+                    f"shift_exceptions was removed, update {sheet_name=}"
+                )
+
+            # check patient_id_col isn't re-used as other column types
+            if patient_id_col in date_columns:
+                raise ValueError(
+                    f"{patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
+                )
+            if patient_id_col in text_columns:
+                raise ValueError(
+                    f"{patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
+                )
+
+            # check that column names don't appear in both
+            col_names = [col for col in date_columns if col in text_columns]
+            if col_names:
+                raise ValueError(
+                    sheet_name
+                    + " has the some columns in both date and text "
+                    + col_names
+                )
+
+            col_names = None
+            patient_id_idx = None
+
+        if (row < header_row) or (row in skip_rows):
+            # TODO; there's a hole here - if header row is 2 and skip_rows is 4,5,6
+            #  ... we'll try to run row 3 without being ready
             continue
-        logger.info(f"Shifting {sheet_name=}")
 
-        # shift the page
-        _shift_book_page(shift_ignore, shift_deltas, sheet_name, sheet_config, book)
+        if row == header_row:
+            # get the real column names now
+            col_names = cells
 
-    logger.info("Output written to '%s'", output_file)
+            # find patient_id_idx and normalize the column name list
+            for col_idx in range(len(col_names)):
+                col_name = col_names[col_idx]
 
+                # if the name is None ... leave it as that (it's fine)
+                if col_name is None:
+                    continue
 
-def _shift_book_page(
-    shift_ignore: dict[str, dict[str, set[str]]],
-    shift_deltas: dict[str, pd.Timedelta],
-    sheet_name: str,
-    sheet_config: dict[str, any],
-    book: Book,
-) -> None:
-    """shifts a single page. the nesting/breakout was done to minimize git changes"""
-    with book[sheet_name] as page:
-        patient_id_col: str = cast(str, sheet_config["patient_id_col"]).strip()
-        date_columns: list[str] = [col.strip() for col in sheet_config["date_columns"]]
-        text_columns: list[str] = [col.strip() for col in sheet_config["text_columns"]]
+                # strip the name
+                col_name = col_name.strip()
 
-        header_row: int = cast(int, sheet_config.get("header_row", 0))
-        skip_rows: list[int] = sheet_config.get("skip_rows_after_header", [])
+                # if the name is now blank; store None as the column name
+                if col_name == "":
+                    col_names[col_idx] = None
+                    continue
 
-        ###
-        # do some checks of the configuration
-        ##
+                # update it to just be the stripped version
+                col_names[col_idx] = col_name
 
-        # this is an old field i want to be careful about skipping
-        if "shift_exceptions" in sheet_config:
-            raise RuntimeError(f"shift_exceptions was removed, update {sheet_name=}")
+                # check the config to see if we know what to do with this column
+                if col_name not in ([patient_id_col] + date_columns + text_columns):
+                    raise ExtraColumn(sheet_name, col_name)
 
-        # check patient_id_col isn't re-used as other column types
-        if patient_id_col in date_columns:
-            raise ValueError(
-                f"{patient_id_col=} shouldn't be in date_columns of {sheet_name=}"
-            )
-        if patient_id_col in text_columns:
-            raise ValueError(
-                f"{patient_id_col=} shouldn't be in text_columns of {sheet_name=}"
-            )
+                # select the patient id
+                if col_name == patient_id_col:
+                    patient_id_idx = col_idx
 
-        # check that column names don't appear in both
-        col_names = [col for col in date_columns if col in text_columns]
-        if col_names:
-            raise ValueError(
-                f"{sheet_name=} has the some columns in both date and text {col_names=}"
-            )
-        # get teh real column names now
-        col_names = [page[header_row, c].value for c in range(page.columns)]
+            # check to be sure we found the patient_id_col/patient_id_idx
+            if patient_id_idx is None:
+                raise PatientColumnMissing(sheet_name, patient_id_col)
 
-        # find patient_id_idx and normalize the column name list
-        patient_id_idx = None
-        for col_idx in range(len(col_names)):
-            col_name = col_names[col_idx]
+            missing = [col for col in text_columns if col not in col_names]
+            if missing:
+                raise TextColumnsMissing(sheet_name, missing)
+            missing = [col for col in date_columns if col not in col_names]
+            if missing:
+                raise DateColumnsMissing(sheet_name, missing)
 
-            # if the name is None ... leave it as that (it's fine)
-            if col_name is None:
-                continue
+            continue
 
-            # strip the name
-            col_name = col_name.strip()
+        if col_names is None:
+            raise RuntimeError("does the sheet skip all the skip rows?")
+        else:
+            row_idx = row
 
-            # if the name is now blank; store None as the column name
-            if col_name == "":
-                col_names[col_idx] = None
-                continue
-
-            # update it to just be the stripped version
-            col_names[col_idx] = col_name
-
-            # check the config to see if we know what to do with this column
-            if col_name not in ([patient_id_col] + date_columns + text_columns):
-                raise ExtraColumn(sheet_name, col_name)
-
-            #
-            if col_name == patient_id_col:
-                patient_id_idx = col_idx
-
-        # check to be sure we found the patient_id_col/patient_id_idx
-        if patient_id_idx is None:
-            raise PatientColumnMissing(sheet_name, patient_id_col)
-
-        missing = [col for col in text_columns if col not in col_names]
-        if missing:
-            raise TextColumnsMissing(sheet_name, missing)
-        missing = [col for col in date_columns if col not in col_names]
-        if missing:
-            raise DateColumnsMissing(sheet_name, missing)
-
-        ###
-        # process each row of the workbook
-        ##
-        for row_idx in range(page.rows):
-            # skip all rows that happen before the header row
-            if row_idx <= header_row:
-                continue
-
-            # skip any skip rows
-            if row_idx in skip_rows:
-                continue
+            ###
+            # process each row of the workbook
+            ##
 
             # write a log message for the user every 40 rows
             if (row_idx % 40) == 0:
                 logger.info(f"Shifting {sheet_name=} up to row {row_idx}")
 
             # get the patient id for this row
-            cell_value = page[row_idx, patient_id_idx].value
+            cell_value = cells[patient_id_idx]
 
             if cell_value:
                 if not isinstance(cell_value, str):
@@ -723,6 +727,7 @@ def _shift_book_page(
             pid = _parse._normalize_patient_id(cell_value)
             if pid is None:
                 # if the pid is None; the rest of the row should be None as well
+                raise RuntimeError("??? check that the empty row is empty")
                 non_blank = [
                     cell
                     for cell in [
@@ -754,23 +759,22 @@ def _shift_book_page(
 
             # now scan each column
             # ... even when page has no date_columns; still check for hidden dates
-            for col_idx in range(page.columns):
+            for col_idx in range(len(cells)):
                 # skip the patient id column (it was already checked anyway)
                 if col_idx == patient_id_idx:
                     continue
 
                 # get the cell value. replace it with None if it's just whitespace
-                cell = page[row_idx, col_idx]
-                cell_value = cell.value
+                cell_value = cells[col_idx]
                 if isinstance(cell_value, str):
                     cell_value = cell_value.strip()
                     if not cell_value:
                         cell_value = None
-                        cell.value = None
 
                 # so if the cell is empty; skip the rest of the checks for this cell
                 # ... we go tot he next column in the row
                 if cell_value is None:
+                    cells[col_idx] = None
                     continue
 
                 # if there's no column name; this column of the row should be None
@@ -782,10 +786,13 @@ def _shift_book_page(
                 # skip values in shift_ignore
                 if "shift_ignore" in sheet_config:
                     raise RuntimeError("move shift_ignore from sheet_configs to a file")
+
                 if sheet_name not in shift_ignore:
                     shift_ignore[sheet_name] = {}
+
                 if col_name not in shift_ignore[sheet_name]:
                     shift_ignore[sheet_name][col_name] = {None, ""}
+
                 if cell_value in shift_ignore[sheet_name][col_name]:
                     continue
 
@@ -811,7 +818,7 @@ def _shift_book_page(
                             cell_value,
                             found,
                         )
-                    cell.value = cell_value
+                    cells[col_idx] = cell_value
                     continue
 
                 # we've already checked this (sort of)
@@ -832,12 +839,12 @@ def _shift_book_page(
                 # controls wether the data is displayed with the 00:00:00 in Excel
                 # ... it might be nice to just drop the time if it's 00:00:00
                 if isinstance(cell_value, datetime):
-                    cell.value = cast(Any, shifted.to_pydatetime())
+                    cells[col_idx] = cast(Any, shifted.to_pydatetime())
                 else:
-                    cell.value = cast(Any, shifted.to_pydatetime().date())
-                    cell.number_format = "yyyy-mm-dd"
+                    cells[col_idx] = cast(Any, shifted.to_pydatetime().date())
+                    print('redo cell.number_format = "yyyy-mm-dd"')
 
-        logger.info(f"Shifting {sheet_name=} processed {row_idx} rows")
+    logger.info("Output written to '%s'", output_file)
 
 
 def patient_shift_deltas(
@@ -880,8 +887,6 @@ def patient_shift_deltas(
                     f"patient_shift_deltas() ; so far {len(patient_ids)=} in {seconds=}"
                 )
     logger.info(f"patient_shift_deltas() ; Found {len(patient_ids)=} in {page.name=}")
-
-    raise Exception("TODO ; update the rest of this")
 
     # load the old ids (should we remove IDs that are "gone"?)
     if isinstance(src_linking_table, str):
