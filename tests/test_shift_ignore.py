@@ -6,12 +6,13 @@ from openpyxl import load_workbook
 from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import HiddenDate, PatientColumnMissing, ShiftFoundNonDate
 
+test_data = Path(__file__).parent / "data/shift_ignore"
 
-def test_shift_exceptions(tmp_path: Path) -> None:
+
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_shift_exceptions(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -26,10 +27,13 @@ def test_shift_exceptions(tmp_path: Path) -> None:
             "shift_exceptions": {"dob": ["mssing"]},
         },
     }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     with pytest.raises(RuntimeError) as info:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
-            output_file=str(output_path),
+            input_file=source_file,
+            output_file=output_path,
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
@@ -43,11 +47,10 @@ def test_shift_exceptions(tmp_path: Path) -> None:
     )
 
 
-def test_ptid_in_date_columns(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_ptid_in_date_columns(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -62,9 +65,12 @@ def test_ptid_in_date_columns(tmp_path: Path) -> None:
             "shift_ignore": {"dob": ["mssing"]},
         },
     }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     with pytest.raises(ValueError) as info:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
@@ -79,11 +85,10 @@ def test_ptid_in_date_columns(tmp_path: Path) -> None:
     )
 
 
-def test_ptid_in_text_columns(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_ptid_in_text_columns(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -98,9 +103,12 @@ def test_ptid_in_text_columns(tmp_path: Path) -> None:
             "shift_ignore": {"dob": ["mssing"]},
         },
     }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     with pytest.raises(ValueError) as info:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
@@ -115,11 +123,10 @@ def test_ptid_in_text_columns(tmp_path: Path) -> None:
     )
 
 
-def test_columns_overlap(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_columns_overlap(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -134,9 +141,12 @@ def test_columns_overlap(tmp_path: Path) -> None:
             "shift_ignore": {"dob": ["mssing"]},
         },
     }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     with pytest.raises(ValueError) as info:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
@@ -152,11 +162,10 @@ def test_columns_overlap(tmp_path: Path) -> None:
     )
 
 
-def test_ptid_column_missing(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_ptid_column_missing(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -171,9 +180,12 @@ def test_ptid_column_missing(tmp_path: Path) -> None:
             "shift_ignore": {"dob": ["mssing"]},
         },
     }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     with pytest.raises(PatientColumnMissing) as info:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
@@ -187,11 +199,12 @@ def test_ptid_column_missing(tmp_path: Path) -> None:
     assert info.value._column_name == "ptid"
 
 
+@pytest.mark.parametrize("use_csv", [False, True])
 @pytest.mark.parametrize("shift_ignore", [True, False])
-def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
+def test_ignore_in_date_columns(
+    use_csv: bool, shift_ignore: bool, tmp_path: Path
+) -> None:
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -206,9 +219,11 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
         },
     }
 
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     def body(shift_ignore_yaml: None | Path) -> None:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-data",
             sheet_configs=sheet_configs,
@@ -230,7 +245,7 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
         assert info.value._value == "mssing"
         return
     else:
-        body(source_file.parent / "shift-ignore.yaml")
+        body(test_data / "shift-ignore.yaml")
 
     workbook = load_workbook(output_path)
 
@@ -269,11 +284,12 @@ def test_ignore_in_date_columns(shift_ignore: bool, tmp_path: Path) -> None:
     assert str(worksheet.cell(7, 2).value) == "1999-11-30 00:00:00"
 
 
+@pytest.mark.parametrize("use_csv", [False, True])
 @pytest.mark.parametrize("shift_ignore", [True, False])
-def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
+def test_ignore_in_text_columns(
+    use_csv: bool, shift_ignore: bool, tmp_path: Path
+) -> None:
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -288,9 +304,11 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         "page-data": "skip",
     }
 
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     def body(shift_ignore_yaml: None | Path) -> None:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-desc",
             sheet_configs=sheet_configs,
@@ -341,10 +359,9 @@ def test_ignore_in_text_columns(shift_ignore: bool, tmp_path: Path) -> None:
         assert expected == obtained
 
 
-def test_move_to_file(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_move_to_file(use_csv: bool, tmp_path: Path) -> None:
 
-    source_file = Path(__file__).parent / "data/shift_ignore/workbook.xlsx"
-    output_path = tmp_path / "target.xlsx"
     linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
@@ -359,6 +376,8 @@ def test_move_to_file(tmp_path: Path) -> None:
         "page-data": "skip",
     }
 
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
     # add the old config we want to remove
     sheet_configs["page-desc"]["shift_ignore"] = {
         "glitter": [
@@ -371,7 +390,7 @@ def test_move_to_file(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError) as error:
         shift_excel_dates_inplace(
-            input_file=str(source_file),
+            input_file=source_file,
             output_file=str(output_path),
             patient_sheet="page-desc",
             sheet_configs=sheet_configs,
@@ -384,3 +403,16 @@ def test_move_to_file(tmp_path: Path) -> None:
         pytest.fail("execution should throw an exception before now")
 
     assert str(error.value) == "move shift_ignore from sheet_configs to a file"
+
+
+def src_and_out_names(
+    use_csv: bool, tmp_path: Path, sheet_configs: dict[str, any]
+) -> tuple[Path | list[Path], Path]:
+    # change the source file to point to the csv files
+    if use_csv:
+        source_file = [test_data / (name + ".csv") for name in sheet_configs]
+        output_path = tmp_path
+    else:
+        source_file = test_data / "workbook.xlsx"
+        output_path = tmp_path / "target.xlsx"
+    return source_file, output_path
