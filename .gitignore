@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 .mypy_cache/
+.coverage
 
 # Virtual environments
 .venv
@@ -22,6 +23,3 @@ tests/output/
 *.jsonl.tar.gz
 
 .DS_Store
-
-# ignore temp excel files
-~*

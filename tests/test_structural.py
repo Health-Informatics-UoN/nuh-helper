@@ -5,11 +5,11 @@ import pytest
 from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import (
     BlankColumnHasData,
-    DateColumnMissing,
+    DateColumnsMissing,
     ExtraColumn,
     ExtraPage,
     PageMissing,
-    TextColumnMissing,
+    TextColumnsMissing,
 )
 
 
@@ -43,7 +43,6 @@ def test_with_blank_column(good: bool, tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -58,8 +57,8 @@ def test_with_blank_column(good: bool, tmp_path: Path) -> None:
         with pytest.raises(BlankColumnHasData) as info:
             body()
         assert info.value._page == "paige"
-        assert info.value._row == 3
-        assert info.value._col == 2
+        assert info.value._row == 2
+        assert info.value._col == 1
         assert info.value._value == "forbidden"
 
 
@@ -85,12 +84,11 @@ def test_date_column_missing(tmp_path: Path) -> None:
         },
         "stuff": "skip",
     }
-    with pytest.raises(DateColumnMissing) as info:
+    with pytest.raises(DateColumnsMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -99,7 +97,7 @@ def test_date_column_missing(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._column_name == "a-missing-date-column"
+    assert info.value._column_names == ["a-missing-date-column"]
 
 
 def test_extra_column(tmp_path: Path) -> None:
@@ -127,7 +125,6 @@ def test_extra_column(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -162,12 +159,11 @@ def test_text_column_missing(tmp_path: Path) -> None:
         },
         "stuff": "skip",
     }
-    with pytest.raises(TextColumnMissing) as info:
+    with pytest.raises(TextColumnsMissing) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -176,7 +172,7 @@ def test_text_column_missing(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._column_name == "a-missing-text-column"
+    assert info.value._column_names == ["a-missing-text-column"]
 
 
 def test_page_missing(tmp_path: Path) -> None:
@@ -217,7 +213,6 @@ def test_page_missing(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -255,7 +250,6 @@ def test_page_extra(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="paige",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
