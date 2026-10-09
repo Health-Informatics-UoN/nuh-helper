@@ -157,8 +157,7 @@ def test_columns_overlap(use_csv: bool, tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
     assert str(info.value) == (
-        "sheet_name='page-data' has the some columns in both date and text "
-        + "col_names=['dob']"
+        "sheet_name='page-data' has the some columns in both date and text ['dob']"
     )
 
 

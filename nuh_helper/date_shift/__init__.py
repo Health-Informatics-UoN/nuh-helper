@@ -637,9 +637,8 @@ def shift_excel_dates_inplace(
             col_names = [col for col in date_columns if col in text_columns]
             if col_names:
                 raise ValueError(
-                    sheet_name
-                    + " has the some columns in both date and text "
-                    + col_names
+                    f"{sheet_name=} has the some columns in both date and text "
+                    + str(col_names)
                 )
 
             col_names = None
