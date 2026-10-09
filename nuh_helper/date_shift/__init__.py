@@ -656,6 +656,7 @@ def shift_excel_dates_inplace(
             # TODO; there's a hole here - if header row is 2 and skip_rows is 4,5,6
             #  ... we'll try to run row 3 without being ready
             continue
+
         if row == header_row:
             # get the real column names now
             col_names = cells

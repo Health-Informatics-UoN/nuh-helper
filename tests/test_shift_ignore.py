@@ -1,7 +1,7 @@
 from pathlib import Path
 
+import book_page
 import pytest
-from openpyxl import load_workbook
 
 from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import HiddenDate, PatientColumnMissing, ShiftFoundNonDate
@@ -247,41 +247,23 @@ def test_ignore_in_date_columns(
     else:
         body(test_data / "shift-ignore.yaml")
 
-    workbook = load_workbook(output_path)
-
-    worksheet = workbook.worksheets[1]
-
-    # first column
-    assert worksheet.cell(1, 1).value == "personal id"
-    assert worksheet.cell(2, 1).value == "pid"
-    assert worksheet.cell(3, 1).value == "nuh71"
-    assert worksheet.cell(4, 1).value == "nuh06"
-    assert worksheet.cell(5, 1).value == "nuh23"
-    assert worksheet.cell(6, 1).value == "nuh67"
-    assert worksheet.cell(7, 1).value == "nuh27"
-
-    # check column 3 is all none
-    assert not [
-        val for val in [worksheet.cell(r + 1, 3).value for r in range(7)] if val
-    ]
-
-    # last column
-    assert worksheet.cell(1, 4).value == "pizza topping"
-    assert worksheet.cell(2, 4).value == "top"
-    assert worksheet.cell(3, 4).value == "cheese"
-    assert worksheet.cell(4, 4).value == "unknown"
-    assert worksheet.cell(5, 4).value == "mushrooms"
-    assert worksheet.cell(6, 4).value == "this can't be a date - sorry 2016"
-    assert worksheet.cell(7, 4).value == "idk - this can't be a date anymore"
-
-    # the important column to check - the dates
-    assert worksheet.cell(1, 2).value == "birthday"
-    assert worksheet.cell(2, 2).value == "dob"
-    assert str(worksheet.cell(3, 2).value) == "2001-12-17 00:00:00"
-    assert str(worksheet.cell(4, 2).value) == "1993-09-20 00:00:00"
-    assert worksheet.cell(5, 2).value is None
-    assert str(worksheet.cell(6, 2).value) == "mssing"  # change that's under test
-    assert str(worksheet.cell(7, 2).value) == "1999-11-30 00:00:00"
+        obtained = load_workbook(output_path)["page-data"]
+        expected = [
+            ["personal id", "birthday", None, "pizza topping"],
+            ["pid", "dob", None, "top"],
+            ["nuh71", "2001-12-17", None, "cheese"],
+            ["nuh06", "1993-09-20", None, "unknown"],
+            ["nuh23", None, None, "mushrooms"],
+            ["nuh67", "mssing", None, "this can't be a date - sorry 2016"],
+            [
+                "nuh27",
+                "1999-11-30",
+                None,
+                "idk - this can't be a date anymore",
+            ],
+            ["nuh65", "mssing", None, "this one has spaces"],
+        ]
+        assert obtained == expected
 
 
 @pytest.mark.parametrize("use_csv", [False, True])
@@ -332,15 +314,9 @@ def test_ignore_in_text_columns(
 
     else:
         # run the shift
-        body(source_file.parent / "shift-ignore.yaml")
+        body(test_data / "shift-ignore.yaml")
 
-        workbook = load_workbook(output_path)
-        page = workbook["page-desc"]
-
-        obtained = [
-            [str(page.cell(row + 1, col + 1).value) for col in range(page.max_column)]
-            for row in range(page.max_row)
-        ]
+        obtained = load_workbook(output_path)["page-desc"]
 
         expected = [
             ["foo", "pid", "glitter"],
@@ -357,6 +333,36 @@ def test_ignore_in_text_columns(
         ]
 
         assert expected == obtained
+
+
+def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
+
+    book = {}
+
+    for page in book_page.book_open(path):
+        data = []
+
+        for row, cells in page.stream_rows():
+            assert row == len(data)
+            for idx, val in enumerate(cells):
+                if val is None:
+                    continue
+                val = str(val).strip()
+                if not val:
+                    cells[idx] = None
+                    continue
+
+                import re
+
+                pattern = r"\d{4}-\d{2}-\d{2} 00:00:00"
+                if re.fullmatch(pattern, val):
+                    val = val[:10]
+                cells[idx] = val
+            data.append(cells)
+
+        book[page.name] = data
+
+    return book
 
 
 @pytest.mark.parametrize("use_csv", [False, True])
@@ -411,7 +417,8 @@ def src_and_out_names(
     # change the source file to point to the csv files
     if use_csv:
         source_file = [test_data / (name + ".csv") for name in sheet_configs]
-        output_path = tmp_path
+        output_path = tmp_path / "output"
+        output_path.mkdir()
     else:
         source_file = test_data / "workbook.xlsx"
         output_path = tmp_path / "target.xlsx"
