@@ -872,9 +872,9 @@ def patient_shift_deltas(
         if row < patient_header_row or row in patient_skip_rows:
             continue
         elif row == patient_header_row:
-            patient_id_col = data.index(patient_id_col_name)
-            if patient_id_col is None:
+            if patient_id_col_name not in data:
                 raise PatientColumnMissing(page.name, patient_id_col_name)
+            patient_id_col = data.index(patient_id_col_name)
         else:
             patient_id = data[patient_id_col]
             if not patient_id:
