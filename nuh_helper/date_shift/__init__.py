@@ -579,9 +579,13 @@ def shift_excel_dates_inplace(
 
     last_name = None
     row_idx = None
+    skipping_sheet_name = ""
     for sheet_name, row, cells in book.stream_copy(output_file):
         assert isinstance(sheet_name, str)
-        if row == 0:
+        if row != 0:
+            if sheet_name != last_name:
+                raise RuntimeError(f"didn't see row0 from {sheet_name=}")
+        else:
             if last_name and row_idx:
                 logger.info(f"Shifting {last_name=} processed {row_idx} rows")
             last_name = sheet_name
@@ -594,6 +598,7 @@ def shift_excel_dates_inplace(
 
             # do nothing to the skipped ones
             if sheet_config == "skip":
+                skipping_sheet_name = sheet_name
                 continue
 
             # grab the configuration
@@ -640,11 +645,17 @@ def shift_excel_dates_inplace(
             col_names = None
             patient_id_idx = None
 
+        # do nothing to the skipped ones
+        if sheet_config == "skip":
+            # "safety" check so that we only skip rows with the correct name
+            if skipping_sheet_name != sheet_name:
+                raise RuntimeError("this shouldn't happen")
+            continue
+
         if (row < header_row) or (row in skip_rows):
             # TODO; there's a hole here - if header row is 2 and skip_rows is 4,5,6
             #  ... we'll try to run row 3 without being ready
             continue
-
         if row == header_row:
             # get the real column names now
             col_names = cells
@@ -727,20 +738,11 @@ def shift_excel_dates_inplace(
             pid = _parse._normalize_patient_id(cell_value)
             if pid is None:
                 # if the pid is None; the rest of the row should be None as well
-                raise RuntimeError("??? check that the empty row is empty")
                 non_blank = [
                     cell
-                    for cell in [
-                        # get all cells
-                        (
-                            col_idx,
-                            col_names[col_idx],
-                            page[row_idx, col_idx].value,
-                        )
-                        for col_idx in range(page.columns)
-                    ]
+                    for cell in cells
                     # keep the cells that aren't blank
-                    if cell[2] is not None and cell[2].strip() != ""
+                    if cell is not None and str(cell).strip() != ""
                 ]
                 if non_blank:
                     raise ValueError(
