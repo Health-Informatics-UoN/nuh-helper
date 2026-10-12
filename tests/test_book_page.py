@@ -246,11 +246,11 @@ def test_xlsx_name_cap() -> Never:
     book = XLSXBook(test_book / "data.xlsx")
     long_name = "name which exceeds 31 characters"
     with (
-        pytest.raises(RuntimeError) as error,
+        pytest.raises(KeyError) as error,
         book[long_name] as page,
     ):
-        raise RuntimeError(f"{long_name=} should have failed {page.name=}")
-    assert str(error.value) == "excel limits you to 31 character page names"
+        pytest.fail(f"{long_name=} should have failed {page.name=}")
+    assert str(error.value) == "'excel limits you to 31 character page names'"
 
 
 def test_bom_is_removed() -> None:

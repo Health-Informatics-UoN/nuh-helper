@@ -14,8 +14,6 @@ import pandas as pd
 
 from nuh_helper.date_shift import _excel, _parse, mappings
 from nuh_helper.date_shift.mappings import (  # noqa: E402
-    PatientColumnMissing,
-    UnknownPatient,
     generate_shift_mappings,
     load_shift_mappings,
 )
@@ -26,8 +24,10 @@ from nuh_helper.date_shift.stream_shift import (
     ExtraPage,
     HiddenDate,
     PageMissing,
+    PatientColumnMissing,
     ShiftFoundNonDate,
     TextColumnsMissing,
+    UnknownPatient,
     shift_excel_dates_inplace,
 )
 

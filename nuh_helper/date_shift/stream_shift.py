@@ -12,6 +12,25 @@ from nuh_helper.date_shift import _parse, mappings
 logger = logging.getLogger(__name__)
 
 
+class PatientColumnMissing(Exception):
+    """raised when the patient column is missing from any sheet"""
+
+    def __init__(self, page_name: str, column_name: str) -> None:
+        message = f"The patient {column_name=} is not present on {page_name=}"
+        super().__init__(message)
+        self._message = message
+
+        self._page_name = page_name
+        self._column_name = column_name
+
+
+class UnknownPatient(Exception):
+    def __init__(self, page: str, id: str) -> None:
+        message = f"Unknown {id=} on {page=}"
+        super().__init__(message)
+        self._message = message
+
+
 class ShiftFoundNonDate(Exception):
     def __init__(
         self, page: str, row: int, col: int, col_name: str, value: str
@@ -183,7 +202,16 @@ def shift_excel_dates_inplace(
 
     book: Book = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
-    # TODO; it'd be cool to "normalize" the linking_table_path/linking_table_output here
+
+    if not linking_table_path:
+        linking_table_path = None
+    elif not isinstance(linking_table_path, Path):
+        linking_table_path = Path(linking_table_path)
+
+    if not linking_table_output:
+        linking_table_output = None
+    elif not isinstance(linking_table_output, Path):
+        linking_table_output = Path(linking_table_output)
 
     # get the shift_ignore: dict[str, dict[str, list[str]]] from shift_ignore_yaml: Path
     if not shift_ignore_yaml:
@@ -220,13 +248,30 @@ def shift_excel_dates_inplace(
         raise PageMissing(patient_sheet)
 
     with book[patient_sheet] as page:
+        patient_header_row = sheet_configs[patient_sheet].get("header_row", 0)
+        patient_skip_rows = sheet_configs[patient_sheet].get("skip_rows", [])
+        patient_id_col_name = sheet_configs[patient_sheet]["patient_id_col"]
+        patient_ids = []
+        for row, data in page.stream_rows():
+            if row < patient_header_row or row in patient_skip_rows:
+                continue
+            elif row == patient_header_row:
+                if patient_id_col_name not in data:
+                    raise PatientColumnMissing(page.name, patient_id_col_name)
+                patient_id_col = data.index(patient_id_col_name)
+            else:
+                patient_id = data[patient_id_col]
+                if not patient_id:
+                    continue
+                patient_id = _parse._normalize_patient_id(patient_id.strip())
+                if patient_id in patient_ids:
+                    continue
+                patient_ids.append(patient_id)
+
         shift_deltas = mappings.patient_shift_deltas(
-            page,
+            patient_ids,
             linking_table_path,
             linking_table_output or "shift_mappings.csv",
-            sheet_configs[patient_sheet]["patient_id_col"],
-            sheet_configs[patient_sheet].get("header_row", 0),
-            sheet_configs[patient_sheet].get("skip_rows", []),
             seed,
             min_shift_days,
             max_shift_days,
@@ -450,7 +495,7 @@ def shift_excel_dates_inplace(
             shift_delta = shift_deltas.get(pid)
             if shift_delta is None:
                 # all patients need to have a shift value
-                raise mappings.UnknownPatient(sheet_name, pid)
+                raise UnknownPatient(sheet_name, pid)
 
             # now scan each column
             # ... even when page has no date_columns; still check for hidden dates

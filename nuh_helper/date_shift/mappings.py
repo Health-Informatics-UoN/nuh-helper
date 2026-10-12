@@ -3,12 +3,10 @@
 import csv
 import logging
 import random
-import time
 from pathlib import Path
 
 import pandas as pd
 
-from nuh_helper.book_page import Page
 from nuh_helper.date_shift import _parse
 
 logger = logging.getLogger(__name__)
@@ -57,65 +55,29 @@ def load_shift_mappings(csv_path: str) -> pd.DataFrame:
     return df
 
 
-class PatientColumnMissing(Exception):
-    """raised when the patient column is missing from any sheet"""
-
-    def __init__(self, page_name: str, column_name: str) -> None:
-        message = f"The patient {column_name=} is not present on {page_name=}"
-        super().__init__(message)
-        self._message = message
-
-        self._page_name = page_name
-        self._column_name = column_name
-
-
-class UnknownPatient(Exception):
-    def __init__(self, page: str, id: str) -> None:
-        message = f"Unknown {id=} on {page=}"
-        super().__init__(message)
-        self._message = message
-
-
 def patient_shift_deltas(
-    page: Page,
+    patient_ids: list[str],
     src_linking_table: str | Path,
     out_linking_table: str | Path,
-    patient_id_col_name: str,
-    patient_header_row: int,
-    patient_skip_rows: list[int] | None,
     seed: int | None,
     min_shift_days: int,
     max_shift_days: int,
 ) -> dict[str, pd.Timedelta]:
+    """:
+    Generate random shift mappings for patient IDs, reusing known patients and saving
+        all to a file.
 
-    logger.info("patient_shift_deltas() ; preparing per-patient shifts")
+    Args:
+        patient_ids: List of patient IDs to generate shifts for.
+        src_linking_table: where to load prior values from
+        out_linking_table: where to save teh full set to
+        seed: Optional random seed for reproducibility.
+        min_shift_days: Minimum number of days to shift (default: -15).
+        max_shift_days: Maximum number of days to shift (default: 15).
 
-    # find the patient id index
-    patient_id_col: None | int = None
-    patient_ids = []
-    start = time.time()
-
-    for row, data in page.stream_rows():
-        if row < patient_header_row or row in patient_skip_rows:
-            continue
-        elif row == patient_header_row:
-            if patient_id_col_name not in data:
-                raise PatientColumnMissing(page.name, patient_id_col_name)
-            patient_id_col = data.index(patient_id_col_name)
-        else:
-            patient_id = data[patient_id_col]
-            if not patient_id:
-                continue
-            patient_id = _parse._normalize_patient_id(patient_id.strip())
-            if patient_id in patient_ids:
-                continue
-            patient_ids.append(patient_id)
-            if (len(patient_ids) % 40) == 0:
-                seconds = time.time() - start
-                logger.info(
-                    f"patient_shift_deltas() ; so far {len(patient_ids)=} in {seconds=}"
-                )
-    logger.info(f"patient_shift_deltas() ; Found {len(patient_ids)=} in {page.name=}")
+    Returns:
+        dictionary mapping 'patient_id' to a pd.Timedelta 'shift_days' which we use.
+    """
 
     # load the old ids (should we remove IDs that are "gone"?)
     if isinstance(src_linking_table, str):
@@ -130,14 +92,11 @@ def patient_shift_deltas(
                 if row and row[1] and row[1].strip() != "shift_days"
                 # if row and row[0] and row[0].strip() != "patient_id"
             }
-    logger.info(
-        f"patient_shift_deltas() ; Loaded {len(old_mappings)=} in {src_linking_table =}"
-    )
-
-    # create the list of all mappings
 
     if seed:
         random.seed(seed)
+
+    # create the list of all mappings
     all_mappings: dict[str, int] = {
         id: (
             old_mappings[id]
@@ -152,11 +111,11 @@ def patient_shift_deltas(
     )
 
     # store all mappings in the out file
+    out_linking_table.parent.mkdir(parents=True, exist_ok=True)
     with open(out_linking_table, "w") as file:
         csv.writer(file).writerows(
             [["patient_id", "shift_days"]]
             + [[key, all_mappings[key]] for key in sorted(all_mappings)]
         )
-    logger.info(f"patient_shift_deltas() ; Saved mappings {out_linking_table}")
 
     return {k: pd.Timedelta(days=all_mappings[k]) for k in all_mappings}
