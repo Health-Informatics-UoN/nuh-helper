@@ -17,7 +17,7 @@ exclude-newer-span = "P7D"
 [[package]]
 name = "book-page"
 version = "0.1.0"
-source = { git = "https://github.com/peterlavalle/book_page.git#c8246740221cc72cb195f815dd3e97a41e320387" }
+source = { git = "https://github.com/peterlavalle/book_page.git?rev=main#ef4758da764c41f5fe2bdb160d0fca60feb848ab" }
 dependencies = [
     { name = "openpyxl" },
 ]
@@ -222,7 +222,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "book-page", git = "https://github.com/peterlavalle/book_page.git" },
+    { name = "book-page", git = "https://github.com/peterlavalle/book_page.git?rev=main" },
     { name = "datefinder", specifier = ">=1.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=3.0.5" },

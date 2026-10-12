@@ -9,7 +9,7 @@ dependencies = [
     "pandas>=3.0.5",
     "openpyxl>=3.1.0",
     "datefinder>=1.0.0",
-    "book_page @ git+https://github.com/peterlavalle/book_page.git@main",
+    "book-page",
 ]
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -41,7 +41,7 @@ dev = [
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-book-page = { git = "https://github.com/peterlavalle/book_page.git" }
+book-page = { git = "https://github.com/peterlavalle/book_page.git", rev = "main" }
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -60,8 +60,8 @@ def run_shift(base: Path, **kwargs: Unpack[_ShiftKwargs]) -> tuple[Path, Path]:
         str(INPUT_FILE),
         str(output),
         patient_sheet="patients",
-        patient_id_col="patient_id",
         sheet_configs=SHEET_CONFIGS,
+        linking_table_path=linking.parent / "old-linking.csv",
         linking_table_output=str(linking),
         **kwargs,
     )

@@ -18,6 +18,8 @@ from nuh_helper.date_shift._excel import (
 )
 from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_value
 
+test_data = Path(__file__).parent / "data" / __name__
+
 
 class TestNormalizePatientId:
     def test_none_returns_none(self) -> None:
@@ -271,8 +273,8 @@ class TestShiftExcelDatesWithComplexLayout:
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "old-linking.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
             seed=42,
         )
@@ -315,8 +317,8 @@ class TestShiftExcelDatesWithComplexLayout:
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "old-linking.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
             seed=42,
         )
@@ -351,21 +353,23 @@ class TestShiftExcelDatesExceptionsIntegration:
         xlsx = tmp_path / "in.xlsx"
         self._make_excel(xlsx)
         out = tmp_path / "out.xlsx"
+
+        # raise Exception(f'{__name__=}')
         sheet_configs = {
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["last_alive"],
                 "text_columns": [],
-                "shift_exceptions": {"last_alive": ["2024-12-31"]},
             }
         }
         shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "does-not-exist.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
+            shift_ignore_yaml=test_data / "shift-ignore.yaml",
             seed=42,
         )
         df = pd.read_excel(str(out), sheet_name="patients")
