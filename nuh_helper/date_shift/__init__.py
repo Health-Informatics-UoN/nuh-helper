@@ -548,7 +548,10 @@ def shift_excel_dates_inplace(
             data = yaml.safe_load(file)
             shift_ignore: dict[str, dict[str, list[str]]] = {
                 page.strip(): {
-                    col.strip(): [ignored.strip() for ignored in data[page][col]]
+                    col.strip(): [
+                        ignored.strip() if isinstance(ignored, str) else ignored
+                        for ignored in data[page][col]
+                    ]
                     + ["", None]
                     for col in data[page]
                 }
@@ -564,7 +567,7 @@ def shift_excel_dates_inplace(
             linking_table_path,
             linking_table_output or "shift_mappings.csv",
             sheet_configs[patient_sheet]["patient_id_col"],
-            sheet_configs[patient_sheet]["header_row"],
+            sheet_configs[patient_sheet].get("header_row", 0),
             sheet_configs[patient_sheet].get("skip_rows", []),
             seed,
             min_shift_days,
