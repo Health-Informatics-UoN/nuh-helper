@@ -578,7 +578,7 @@ def shift_excel_dates_inplace(
             raise PageMissing(sheet_name)
 
     last_name = None
-    row_idx = None
+    last_row = None
     skipping_sheet_name = ""
 
     ##
@@ -599,10 +599,12 @@ def shift_excel_dates_inplace(
             # SAN/safety check in case something tries to skip showing us rows
             if sheet_name != last_name:
                 raise RuntimeError(f"didn't see row0 from {sheet_name=}")
+            last_row = row_idx
         else:
             if last_name and row_idx:
-                logger.info(f"Shifting {last_name=} processed {row_idx} rows")
+                logger.info(f"Shifting {last_name=} processed {last_row} rows")
             last_name = sheet_name
+            last_row = row_idx
 
             # check that it's in the configs
             if sheet_name not in sheet_configs:
@@ -876,6 +878,9 @@ def shift_excel_dates_inplace(
                     row_cells[col_idx] = cast(Any, shifted.to_pydatetime().date())
                     print('redo cell.number_format = "yyyy-mm-dd"')
 
+    logger.info(
+        f"Shifting {last_name=} processed {last_row} rows (and that's the last page)"
+    )
     logger.info("Output written to '%s'", output_file)
 
 
