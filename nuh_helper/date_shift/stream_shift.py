@@ -248,7 +248,7 @@ def shift_excel_dates_inplace(
         raise PageMissing(patient_sheet)
 
     with book[patient_sheet] as page:
-        scanner = row_scanner(sheet_configs)
+        scanner = PatientRowStateMachine(sheet_configs)
         shift_deltas = mappings.patient_shift_deltas(
             [
                 pid
@@ -264,6 +264,7 @@ def shift_excel_dates_inplace(
             min_shift_days,
             max_shift_days,
         )
+        scanner = None
     logger.info(f"loaded deltas {len(shift_deltas)=}")
 
     # check for missing sheets
@@ -280,11 +281,14 @@ def shift_excel_dates_inplace(
     # - no option to add/remove rows is available
     # - no option to jump/seek through rows is available
     #   - ... which is why this acts a bit weird
-    scanner = row_scanner(sheet_configs)
+    scanner = PatientRowStateMachine(sheet_configs)
     for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
+        # check if we're in a patient row
+        # ... the method will raise exceptions if something is wrong or mis-configured
         pid = scanner.patient_id(sheet_name, row_idx, row_cells)
         if not pid:
             continue
+
         # determine how many days to shift
         shift_delta = shift_deltas.get(pid)
         if shift_delta is None:
@@ -306,7 +310,7 @@ def shift_excel_dates_inplace(
                     cell_value = None
 
             # so if the cell is empty; skip the rest of the checks for this cell
-            # ... we go tot he next column in the row
+            # ... we go to the next column in the row
             if cell_value is None:
                 row_cells[col_idx] = None
                 continue
@@ -317,44 +321,17 @@ def shift_excel_dates_inplace(
             if col_name is None:
                 raise BlankColumnHasData(sheet_name, row_idx, col_idx, cell_value)
 
-            # skip values in shift_ignore
-
-            if sheet_name not in shift_ignore:
-                shift_ignore[sheet_name] = {}
-
-            if col_name not in shift_ignore[sheet_name]:
-                shift_ignore[sheet_name][col_name] = {None, ""}
-
-            if cell_value in shift_ignore[sheet_name][col_name]:
+            # skip values in shift_ignore and text columns
+            # ... the check also looks for hidden dates
+            if not check_is_shifted(
+                scanner,
+                shift_ignore,
+                row_idx,
+                col_idx,
+                cell_value,
+                row_cells,
+            ):
                 continue
-
-            # for text columns, we now *just* need to check for a hidden date
-            if col_name in scanner._text_columns:
-                # check for dates in non-date columns
-                for found in datefinder.find_dates(str(cell_value)):
-                    logger.debug(
-                        f"found hidden date {sheet_name=}/{col_name=}:{cell_value}"
-                    )
-                    ignored = shift_ignore[sheet_name][col_name]
-                    logger.debug(
-                        f"shift_ignore[{sheet_name=}][{col_name=}]= {len(ignored)}"
-                    )
-                    for ig in ignored:
-                        logger.debug(f"- {ig}")
-
-                    raise HiddenDate(
-                        sheet_name,
-                        row_idx,
-                        col_idx,
-                        col_name,
-                        cell_value,
-                        found,
-                    )
-                row_cells[col_idx] = cell_value
-                continue
-
-            # we've already checked this (sort of)
-            # assert col_name in date_columns
 
             # cell_value can be str | datetime | date
             # ... so parsed might not always succeed
@@ -379,7 +356,7 @@ def shift_excel_dates_inplace(
     logger.info("Output written to '%s'", output_file)
 
 
-class row_scanner:
+class PatientRowStateMachine:
     """builds upon the callbacks from book_page to handle row/page switching. does all
     the checking for configs and what page we're on. needed because both patient IDs and
     The Big Loop need the same checks"""
@@ -574,3 +551,50 @@ class row_scanner:
 
         # it's a valid pid - return it
         return pid
+
+
+def check_is_shifted(
+    scanner: PatientRowStateMachine,
+    shift_ignore: list[str],
+    row_idx: int,
+    col_idx: int,
+    cell_value: str,
+    row_cells: list,
+) -> bool:
+    sheet_name: str = scanner._last_name
+    col_name: str = scanner._col_names[col_idx]
+
+    if sheet_name not in shift_ignore:
+        shift_ignore[sheet_name] = {}
+
+    if col_name not in shift_ignore[sheet_name]:
+        shift_ignore[sheet_name][col_name] = {None, ""}
+
+    if cell_value in shift_ignore[sheet_name][col_name]:
+        return False
+
+    # patient_id_col has already been checked
+
+    if col_name in scanner._date_columns:
+        return True
+
+    # for text columns, we now *just* need to check for a hidden date
+    if col_name in scanner._text_columns:
+        # check for dates in non-date columns
+        for found in datefinder.find_dates(str(cell_value)):
+            logger.debug(f"found hidden date {sheet_name=}/{col_name=}:{cell_value}")
+            ignored = shift_ignore[sheet_name][col_name]
+            logger.debug(f"shift_ignore[{sheet_name=}][{col_name=}]= {len(ignored)}")
+            for ig in ignored:
+                logger.debug(f"- {ig}")
+
+            raise HiddenDate(
+                sheet_name,
+                row_idx,
+                col_idx,
+                col_name,
+                cell_value,
+                found,
+            )
+        row_cells[col_idx] = cell_value
+        return False
