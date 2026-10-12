@@ -681,6 +681,7 @@ def shift_excel_dates_inplace(
             if skipping_sheet_name != sheet_name:
                 raise RuntimeError("this shouldn't happen")
             continue
+        logger.info(f"Shifting {sheet_name=}")
 
         # skip pre-header and skip rows
         if (row_idx < header_row) or (row_idx in skip_rows):
