@@ -45,7 +45,7 @@ class XLSXBook(Book):
     def __getitem__(self, name: str) -> gen[Page]:
 
         if len(name) > 31:
-            raise RuntimeError("excel limits you to 31 character page names")
+            raise KeyError("excel limits you to 31 character page names")
 
         class XLSXPage(Page):
             def stream_rows(self) -> gen[tuple[int, list[str]]]:
