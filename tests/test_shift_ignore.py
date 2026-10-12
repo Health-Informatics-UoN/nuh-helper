@@ -410,6 +410,55 @@ def test_move_to_file(use_csv: bool, tmp_path: Path) -> None:
     assert str(error.value) == "move shift_ignore from sheet_configs to a file"
 
 
+@pytest.mark.parametrize("use_csv", [False, True])
+def test_skip_hole(use_csv: bool, tmp_path: Path) -> None:
+
+    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
+
+    sheet_configs = {
+        "page-desc": {
+            "patient_id_col": "pid",
+            "date_columns": [],
+            "text_columns": ["foo", "glitter"],
+            "header_row": 0,
+            "skip_rows_after_header": [2],
+        },
+        "page-data": "skip",
+    }
+
+    source_file, output_path = src_and_out_names(use_csv, tmp_path, sheet_configs)
+
+    # add the old config we want to remove
+    sheet_configs["page-desc"]["shift_ignore"] = {
+        "glitter": [
+            "can't recall the date but on 12/11/2001 they had an itchy tummy",
+        ],
+        "foo": [
+            "agreed on 21st jul 2017",
+        ],
+    }
+
+    with pytest.raises(RuntimeError) as error:
+        shift_excel_dates_inplace(
+            input_file=source_file,
+            output_file=str(output_path),
+            patient_sheet="page-desc",
+            sheet_configs=sheet_configs,
+            min_shift_days=-20,
+            max_shift_days=-1,
+            seed=14333,
+            linking_table_path=str(linking_table_old),
+            linking_table_output=str(linking_table_out),
+        )
+        pytest.fail("execution should throw an exception before now")
+
+    assert str(error.value) == (
+        "sheet_name='page-desc' and missing_skipped=[1]"
+        + " but header_row=0 and skip_rows=[2]"
+    )
+
+
 def src_and_out_names(
     use_csv: bool, tmp_path: Path, sheet_configs: dict[str, any]
 ) -> tuple[Path | list[Path], Path]:

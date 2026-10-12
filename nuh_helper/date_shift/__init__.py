@@ -580,9 +580,23 @@ def shift_excel_dates_inplace(
     last_name = None
     row_idx = None
     skipping_sheet_name = ""
-    for sheet_name, row, cells in book.stream_copy(output_file):
+
+    ##
+    # this calls the `.stream_copy()` method to copy from one book to another
+    # WARNING; this works like a callback rather than a loop;
+    # - each iteration is a callback from copy with a source row
+    # - each row is passed with a sheet name and a row number
+    # - modify the values in the row_cells to change what's in the output file(s)
+    # - no option to add/remove rows is available
+    # - no option to jump/seek through rows is available
+    #   - ... which is why this acts a bit weird
+    for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
+        #####
+        # Part-1; check if we've reached a different sheet
+        ##
         assert isinstance(sheet_name, str)
-        if row != 0:
+        if row_idx != 0:
+            # SAN/safety check in case something tries to skip showing us rows
             if sheet_name != last_name:
                 raise RuntimeError(f"didn't see row0 from {sheet_name=}")
         else:
@@ -617,7 +631,20 @@ def shift_excel_dates_inplace(
             # do some checks of the configuration
             ##
 
-            # this is an old field i want to be careful about skipping
+            # check for holes in skip_rows (possible issue)
+            if skip_rows:
+                missing_skipped = [
+                    not_skipped + 1
+                    for not_skipped in range(header_row, max(skip_rows))
+                    if (not_skipped + 1) not in skip_rows
+                ]
+                if missing_skipped:
+                    raise RuntimeError(
+                        f"{sheet_name=} and {missing_skipped=} but"
+                        + f" {header_row=} and {skip_rows=}"
+                    )
+
+            # check if the config hard-codes patient data to skip
             if "shift_exceptions" in sheet_config:
                 raise RuntimeError(
                     f"shift_exceptions was removed, update {sheet_name=}"
@@ -644,21 +671,28 @@ def shift_excel_dates_inplace(
             col_names = None
             patient_id_idx = None
 
-        # do nothing to the skipped ones
+        #####
+        # Part-2; skip skipped sheets, and, skip skipped rows
+        ##
+
+        # do nothing to the skipped sheets
         if sheet_config == "skip":
             # "safety" check so that we only skip rows with the correct name
             if skipping_sheet_name != sheet_name:
                 raise RuntimeError("this shouldn't happen")
             continue
 
-        if (row < header_row) or (row in skip_rows):
-            # TODO; there's a hole here - if header row is 2 and skip_rows is 4,5,6
-            #  ... we'll try to run row 3 without being ready
+        # skip pre-header and skip rows
+        if (row_idx < header_row) or (row_idx in skip_rows):
+            # there's an earlier check to find "holes" in the skip-rows
             continue
 
-        if row == header_row:
+        #####
+        # Part-3; handle the header rows
+        ##
+        if row_idx == header_row:
             # get the real column names now
-            col_names = cells
+            col_names = row_cells
 
             # find patient_id_idx and normalize the column name list
             for col_idx in range(len(col_names)):
@@ -700,47 +734,42 @@ def shift_excel_dates_inplace(
 
             continue
 
+        #####
+        # Part-4; process normal columns
+        ##
         if col_names is None:
             raise RuntimeError("does the sheet skip all the skip rows?")
         else:
-            row_idx = row
+            # code used to be indented like this
 
             ###
             # process each row of the workbook
             ##
 
-            # write a log message for the user every 40 rows
+            # write a log message every 40 rows (show we're not crashed)
             if (row_idx % 40) == 0:
                 logger.info(f"Shifting {sheet_name=} up to row {row_idx}")
 
             # get the patient id for this row
-            cell_value = cells[patient_id_idx]
-
-            if cell_value:
-                if not isinstance(cell_value, str):
-                    raise ValueError(
-                        f"bad val {sheet_name=} {patient_id_col=} ;; {cell_value=}"
-                    )
-
-                cell_value = cell_value.strip()
+            pid = row_cells[patient_id_idx]
 
             # check for date in the cell_value
-            for found in datefinder.find_dates(str(cell_value)):
+            for found in datefinder.find_dates(str(pid)):
                 raise HiddenDate(
                     sheet_name,
                     row_idx,
                     patient_id_idx,
                     patient_id_col,
-                    cell_value,
+                    pid,
                     found,
                 )
 
-            pid = _parse._normalize_patient_id(cell_value)
+            pid = _parse._normalize_patient_id(pid)
             if pid is None:
                 # if the pid is None; the rest of the row should be None as well
                 non_blank = [
                     cell
-                    for cell in cells
+                    for cell in row_cells
                     # keep the cells that aren't blank
                     if cell is not None and str(cell).strip() != ""
                 ]
@@ -761,13 +790,13 @@ def shift_excel_dates_inplace(
 
             # now scan each column
             # ... even when page has no date_columns; still check for hidden dates
-            for col_idx in range(len(cells)):
+            for col_idx in range(len(row_cells)):
                 # skip the patient id column (it was already checked anyway)
                 if col_idx == patient_id_idx:
                     continue
 
                 # get the cell value. replace it with None if it's just whitespace
-                cell_value = cells[col_idx]
+                cell_value = row_cells[col_idx]
                 if isinstance(cell_value, str):
                     cell_value = cell_value.strip()
                     if not cell_value:
@@ -776,7 +805,7 @@ def shift_excel_dates_inplace(
                 # so if the cell is empty; skip the rest of the checks for this cell
                 # ... we go tot he next column in the row
                 if cell_value is None:
-                    cells[col_idx] = None
+                    row_cells[col_idx] = None
                     continue
 
                 # if there's no column name; this column of the row should be None
@@ -820,7 +849,7 @@ def shift_excel_dates_inplace(
                             cell_value,
                             found,
                         )
-                    cells[col_idx] = cell_value
+                    row_cells[col_idx] = cell_value
                     continue
 
                 # we've already checked this (sort of)
@@ -841,9 +870,9 @@ def shift_excel_dates_inplace(
                 # controls wether the data is displayed with the 00:00:00 in Excel
                 # ... it might be nice to just drop the time if it's 00:00:00
                 if isinstance(cell_value, datetime):
-                    cells[col_idx] = cast(Any, shifted.to_pydatetime())
+                    row_cells[col_idx] = cast(Any, shifted.to_pydatetime())
                 else:
-                    cells[col_idx] = cast(Any, shifted.to_pydatetime().date())
+                    row_cells[col_idx] = cast(Any, shifted.to_pydatetime().date())
                     print('redo cell.number_format = "yyyy-mm-dd"')
 
     logger.info("Output written to '%s'", output_file)
