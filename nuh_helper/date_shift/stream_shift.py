@@ -296,7 +296,9 @@ def shift_excel_dates_inplace(
     # - no option to add/remove rows is available
     # - no option to jump/seek through rows is available
     #   - ... which is why this acts a bit weird
+    steate_tool = row_state(sheet_configs)
     for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
+        steate_tool.in_body(sheet_name, row_idx, row_cells)
         #####
         # Part-1; check if we've reached a different sheet
         ##
@@ -588,3 +590,147 @@ def shift_excel_dates_inplace(
         f"Shifting {last_name=} processed {last_row} rows (and that's the last page)"
     )
     logger.info("Output written to '%s'", output_file)
+
+
+class row_state:
+    def __init__(self, sheet_configs: dict[str, dict]) -> None:
+        self._sheet_configs = sheet_configs
+        self._last_name: None | str = None
+        self._last_row: None | int = None
+        self._header_row: None | int = None
+        self._skip_rows: None | list[int] = None
+
+        self._col_names: None | list[str] = None
+        self._patient_id_idx: None | int = None
+        self._patient_id_col: None | str = None
+        self._date_columns: None | list[str] = None
+        self._text_columns: None | list[str] = None
+        self._sheet_config: None | dict | str = None
+
+    def in_body(self, sheet_name: str, row_idx: int, row_cells: list) -> str | bool:
+        # check that it's in the configs
+        if sheet_name not in self._sheet_configs:
+            raise ExtraPage(sheet_name)
+
+        if row_idx != 0:
+            # SAN/safety check in case something tries to skip showing us rows
+            if sheet_name != self._last_name:
+                raise RuntimeError(f"didn't see row0 from {sheet_name=}")
+            self._last_row = row_idx
+
+        if row_idx == 0:
+            self._last_name = sheet_name
+            self._last_row = row_idx
+
+            self._sheet_config: dict | str = self._sheet_configs[sheet_name]
+
+            # do nothing to the skipped ones
+            if self._sheet_config == "skip":
+                return False
+
+            # grab the configuration
+            self.pid_column: str = cast(
+                str, self._sheet_config["patient_id_col"]
+            ).strip()
+            self._date_columns: list[str] = [
+                col.strip() for col in self._sheet_config["date_columns"]
+            ]
+            self._text_columns: list[str] = [
+                col.strip() for col in self._sheet_config["text_columns"]
+            ]
+
+            self._header_row: int = cast(int, self._sheet_config.get("header_row", 0))
+            self._skip_rows: list[int] = self._sheet_config.get(
+                "skip_rows_after_header", []
+            )
+
+            ###
+            # do some checks of the configuration
+            ##
+
+            # check for holes in skip_rows (possible issue)
+            if self._skip_rows:
+                missing_skipped = [
+                    not_skipped + 1
+                    for not_skipped in range(self._header_row, max(self._skip_rows))
+                    if (not_skipped + 1) not in self._skip_rows
+                ]
+                if missing_skipped:
+                    raise RuntimeError(
+                        f"{sheet_name=} and {missing_skipped=} but"
+                        + f" {self._header_row=} and {self._skip_rows=}"
+                    )
+
+            # check if the config hard-codes patient data to skip
+            if "shift_exceptions" in self._sheet_configs:
+                raise RuntimeError(
+                    f"shift_exceptions was removed, update {sheet_name=}"
+                )
+
+            # check patient_id_col isn't re-used as other column types
+            if self.pid_column in self._date_columns:
+                raise ValueError(
+                    f"{self.pid_column=} shouldn't be in date_columns of {sheet_name=}"
+                )
+            if self.pid_column in self._text_columns:
+                raise ValueError(
+                    f"{self.pid_column=} shouldn't be in text_columns of {sheet_name=}"
+                )
+
+            # check that column names don't appear in both
+            col_names = [col for col in self._date_columns if col in self._text_columns]
+            if col_names:
+                raise ValueError(
+                    f"{sheet_name=} has the some columns in both date and text "
+                    + str(col_names)
+                )
+
+            self._col_names = None
+            self._patient_id_idx = None
+
+        if self._sheet_config == "skip":
+            return False
+
+        if row_idx < self._header_row:
+            return False
+
+        if row_idx == self._header_row:
+            raise Exception("compute columns and indcides")
+
+        if row_idx in self._skip_rows:
+            return False
+
+        # get the patient id for this row
+        pid = row_cells[self._patient_id_idx]
+
+        # check for date in the cell_value
+        for found in datefinder.find_dates(str(pid)):
+            raise HiddenDate(
+                sheet_name,
+                row_idx,
+                self._patient_id_idx,
+                self._patient_id_col,
+                pid,
+                found,
+            )
+
+        pid = _parse._normalize_patient_id(pid)
+        if pid is None:
+            # if the pid is None; the rest of the row should be None as well
+            non_blank = [
+                cell
+                for cell in row_cells
+                # keep the cells that aren't blank
+                if cell is not None and str(cell).strip() != ""
+            ]
+            if non_blank:
+                raise ValueError(
+                    f"{row_idx=} has no pid, should be blank but has {non_blank}"
+                )
+
+            # we've completed the checks for a None pid
+            # ... so we need to skip the rest of this loop
+            return False
+
+        # it's a valid pid - return it
+        return pid
