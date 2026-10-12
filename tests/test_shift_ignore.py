@@ -61,7 +61,6 @@ def test_ptid_in_date_columns(use_csv: bool, tmp_path: Path) -> None:
             "text_columns": ["top"],
             "header_row": 1,
             "skip_rows_after_header": [],
-            "shift_ignore": {"dob": ["mssing"]},
         },
     }
 
@@ -99,7 +98,6 @@ def test_ptid_in_text_columns(use_csv: bool, tmp_path: Path) -> None:
             "text_columns": ["top", "pid"],
             "header_row": 1,
             "skip_rows_after_header": [],
-            "shift_ignore": {"dob": ["mssing"]},
         },
     }
 
@@ -137,7 +135,6 @@ def test_columns_overlap(use_csv: bool, tmp_path: Path) -> None:
             "text_columns": ["top", "dob"],
             "header_row": 1,
             "skip_rows_after_header": [],
-            "shift_ignore": {"dob": ["mssing"]},
         },
     }
 
@@ -175,7 +172,6 @@ def test_ptid_column_missing(use_csv: bool, tmp_path: Path) -> None:
             "text_columns": ["top", "pid"],
             "header_row": 1,
             "skip_rows_after_header": [],
-            "shift_ignore": {"dob": ["mssing"]},
         },
     }
 
