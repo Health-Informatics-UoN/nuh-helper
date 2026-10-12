@@ -375,6 +375,8 @@ class PatientRowStateMachine:
         self._text_columns: None | list[str] = None
         self._sheet_config: None | dict | str = None
 
+        print("TODO; this should use a dataclass for the row-data that shifts")
+
     def patient_id(self, sheet_name: str, row_idx: int, row_cells: list) -> str | bool:
         # check that it's in the configs
         if sheet_name not in self._sheet_configs:
