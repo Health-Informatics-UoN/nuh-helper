@@ -601,7 +601,7 @@ def shift_excel_dates_inplace(
                 raise RuntimeError(f"didn't see row0 from {sheet_name=}")
             last_row = row_idx
         else:
-            if last_name and row_idx:
+            if last_name and last_row:
                 logger.info(f"Shifting {last_name=} processed {last_row} rows")
             last_name = sheet_name
             last_row = row_idx
