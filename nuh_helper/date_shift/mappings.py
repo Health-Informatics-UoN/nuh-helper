@@ -7,8 +7,8 @@ import time
 from pathlib import Path
 
 import pandas as pd
-from book_page import Page
 
+from nuh_helper.book_page import Page
 from nuh_helper.date_shift import _parse
 
 logger = logging.getLogger(__name__)

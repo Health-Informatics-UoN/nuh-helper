@@ -5,8 +5,8 @@ from typing import Any, cast
 
 import datefinder
 import yaml
-from book_page import Book, book_open
 
+from nuh_helper.book_page import Book, book_open
 from nuh_helper.date_shift import _parse, mappings
 
 logger = logging.getLogger(__name__)

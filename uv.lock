@@ -15,14 +15,6 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [[package]]
-name = "book-page"
-version = "0.1.0"
-source = { git = "https://github.com/peterlavalle/book_page.git#c8246740221cc72cb195f815dd3e97a41e320387" }
-dependencies = [
-    { name = "openpyxl" },
-]
-
-[[package]]
 name = "cfgv"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -202,7 +194,6 @@ wheels = [
 name = "nuh-helper"
 source = { editable = "." }
 dependencies = [
-    { name = "book-page" },
     { name = "datefinder" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -222,7 +213,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "book-page", git = "https://github.com/peterlavalle/book_page.git" },
     { name = "datefinder", specifier = ">=1.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=3.0.5" },
