@@ -5,8 +5,6 @@ Consistently shifts dates for patient IDs across multiple sheets and columns
 in an Excel file, with support for reproducible shifts using a linking table.
 """
 
-import logging
-
 from nuh_helper.date_shift.mappings import (  # noqa: E402
     generate_shift_mappings,
     load_shift_mappings,
@@ -24,8 +22,6 @@ from nuh_helper.date_shift.stream_shift import (
     UnknownPatient,
     shift_excel_dates_inplace,
 )
-
-logger = logging.getLogger(__name__)
 
 # Re-export public API
 __all__ = [
