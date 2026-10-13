@@ -5,6 +5,11 @@ import pytest
 from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.date_shift import UnknownPatient
 
+test_data = (
+    # i feel like test data should be in a folder following this pattern
+    Path(__file__).parent / "data" / __name__
+)
+
 
 def test_missing_id(tmp_path: Path) -> None:
 
@@ -29,7 +34,7 @@ def test_missing_id(tmp_path: Path) -> None:
         },
     }
 
-    source_file = str(Path(__file__).parent / "data/missing-id.xlsx")
+    source_file = str(test_data / "missing-id.xlsx")
     output_path = tmp_path / "target.xlsx"
     linking_table_old = tmp_path / "linking_table_old.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
