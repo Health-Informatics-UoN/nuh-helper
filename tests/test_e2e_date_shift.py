@@ -27,6 +27,8 @@ class _ShiftKwargs(TypedDict, total=False):
 DATA_DIR = Path(__file__).parent / "data"
 INPUT_FILE = DATA_DIR / "patients.xlsx"
 
+test_data = Path(__file__).parent / "data" / __name__
+
 # Config matching the structure of patients.xlsx
 SHEET_CONFIGS = {
     "patients": {
@@ -63,6 +65,7 @@ def run_shift(base: Path, **kwargs: Unpack[_ShiftKwargs]) -> tuple[Path, Path]:
         sheet_configs=SHEET_CONFIGS,
         linking_table_path=linking.parent / "old-linking.csv",
         linking_table_output=str(linking),
+        shift_ignore_yaml=test_data / ("shift-ignore.yaml"),
         **kwargs,
     )
     return output, linking
@@ -204,10 +207,10 @@ class TestReproducibility:
             str(INPUT_FILE),
             str(output2),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=SHEET_CONFIGS,
             linking_table_path=str(linking),
             linking_table_output=str(output_path / "linking2.csv"),
+            shift_ignore_yaml=test_data / ("shift-ignore.yaml"),
         )
 
         for sheet in SHEET_CONFIGS:
