@@ -37,24 +37,6 @@ def generate_shift_mappings(
     return pd.DataFrame({"patient_id": patient_ids, "shift_days": shifts})
 
 
-def load_shift_mappings(csv_path: str) -> pd.DataFrame:
-    """
-    Load shift mappings from a CSV file.
-
-    Args:
-        csv_path: Path to the CSV file containing shift mappings.
-                  Expected columns: 'patient_id' and 'shift_days'.
-
-    Returns:
-        DataFrame with shift mappings.
-    """
-    df = pd.read_csv(csv_path)
-    if "patient_id" not in df.columns or "shift_days" not in df.columns:
-        raise ValueError("CSV must contain 'patient_id' and 'shift_days' columns")
-    logger.info("Loaded %d shift mapping(s) from '%s'", len(df), csv_path)
-    return df
-
-
 def patient_shift_deltas(
     patient_ids: list[str],
     src_linking_table: str | Path,

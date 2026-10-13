@@ -9,7 +9,6 @@ from openpyxl import Workbook
 
 from nuh_helper.date_shift import (
     generate_shift_mappings,
-    load_shift_mappings,
     shift_excel_dates_inplace,
 )
 from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_value
@@ -115,21 +114,6 @@ class TestGenerateShiftMappings:
     def test_empty_patient_list(self) -> None:
         result = generate_shift_mappings([])
         assert len(result) == 0
-
-
-class TestLoadShiftMappings:
-    def test_loads_valid_csv(self, tmp_path: Path) -> None:
-        csv_file = tmp_path / "shifts.csv"
-        csv_file.write_text("patient_id,shift_days\nP001,5\nP002,-3\n")
-        result = load_shift_mappings(str(csv_file))
-        assert list(result["patient_id"]) == ["P001", "P002"]
-        assert list(result["shift_days"]) == [5, -3]
-
-    def test_raises_on_missing_columns(self, tmp_path: Path) -> None:
-        csv_file = tmp_path / "bad.csv"
-        csv_file.write_text("id,days\nP001,5\n")
-        with pytest.raises(ValueError, match="patient_id.*shift_days"):
-            load_shift_mappings(str(csv_file))
 
 
 class TestShiftExcelDatesWithComplexLayout:
