@@ -1,8 +1,7 @@
 """implements a Finite State Machine to handle calls from the streaming.
 
-While the book_page API is meant to be generic, this is certainly not
-
-
+While the book_page API is meant to be generic, this is certainly not - so it's part of
+the shift module.
 """
 
 import logging
@@ -13,8 +12,8 @@ from pathlib import Path
 from typing import Literal, cast
 
 import datefinder
-from book_page import Book
 
+from nuh_helper.book_page import Book, normalize_row
 from nuh_helper.date_shift import _parse
 from nuh_helper.date_shift.defs import (
     DateColumnsMissing,
@@ -22,7 +21,6 @@ from nuh_helper.date_shift.defs import (
     HiddenDate,
     PatientColumnMissing,
     TextColumnsMissing,
-    normalize_inplace,
     sheet_configs_t,
 )
 
@@ -88,8 +86,6 @@ class PatientRowStateMachine:
         this row doesn't need further processing, or a page-description that includes
         the located patient id"""
 
-        row_cells = normalize_inplace(row_cells)
-
         sheet_config: dict | str = self._sheet_configs[sheet_name]
 
         if row_idx == 0:
@@ -143,8 +139,8 @@ class PatientRowStateMachine:
 
             # grab the configuration
             patient_id_col: str = str(sheet_config["patient_id_col"]).strip()
-            date_columns: list[str] = normalize_inplace(sheet_config["date_columns"])
-            text_columns: list[str] = normalize_inplace(sheet_config["text_columns"])
+            date_columns: list[str] = normalize_row(sheet_config["date_columns"])
+            text_columns: list[str] = normalize_row(sheet_config["text_columns"])
 
             # check patient_id_col isn't re-used as other column types
             if patient_id_col in date_columns:

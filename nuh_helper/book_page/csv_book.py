@@ -4,12 +4,14 @@ from _collections_abc import dict_keys
 from collections.abc import Generator as gen
 from pathlib import Path
 
-from nuh_helper.book_page.book import Book, Page
+from nuh_helper.book_page.book import Book, Page, normalize_row, row_val_t
 
 
 class CSVBook(Book):
     def __init__(self, path: str | Path | list[Path]) -> None:
-        self._page_files = {page.stem.lower(): page for page in csv_files(path)}
+        self._page_files = {
+            page.stem.lower(): page.absolute() for page in csv_files(path)
+        }
 
     def keys(self) -> dict_keys:
         return self._page_files.keys()
@@ -18,7 +20,7 @@ class CSVBook(Book):
     def __getitem__(self, name: str) -> gen[Page]:
 
         class CSVPage(Page):
-            def stream_rows(self) -> gen[tuple[int, list[str]]]:
+            def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
                 assert isinstance(self._page, Path)
                 with self._page.open() as file:
                     for row, line in enumerate(
@@ -27,15 +29,6 @@ class CSVBook(Book):
                             delimiter="\t" if file.name.endswith(".tsv") else ",",
                         )
                     ):
-                        # strip cell strings
-                        line = [
-                            cell.strip() if isinstance(cell, str) else cell
-                            for cell in line
-                        ]
-
-                        # convert empty cells to None
-                        line = [cell if cell else None for cell in line]
-
                         # strip bom
                         if (
                             row == 0
@@ -44,18 +37,15 @@ class CSVBook(Book):
                         ):
                             line[0] = line[0][1:]
 
-                        yield (
-                            row,
-                            line,
-                        )
+                        # strip cell strings, convert empty cells to None
+                        line = normalize_row(line)
+
+                        yield (row, line)
 
         assert isinstance(self._page_files[name], Path)
         yield CSVPage(name, self._page_files[name])
 
-    def stream_copy(self, into: str | Path) -> gen[tuple[str, int, list[str]]]:
-        if not isinstance(into, Path):
-            into = Path(into)
-        into = into.absolute()
+    def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
 
         if into.is_file():
             raise RuntimeError(f"can't write csvs to {into} because it's a file")
@@ -65,7 +55,7 @@ class CSVBook(Book):
             [
                 input
                 for input in self._page_files.values()
-                if str(input.absolute()).startswith(str(into))
+                if str(input).startswith(str(into))
             ]
         ):
             raise RuntimeError(
@@ -82,9 +72,9 @@ class CSVBook(Book):
                     data, delimiter="\t" if file.endswith(".tsv") else ","
                 )
 
-                for row, cell in page.stream_rows():
-                    yield name, row, cell
-                    writer.writerow(cell)
+                for row_idx, row_cells in page.stream_rows():
+                    yield name, row_idx, row_cells
+                    writer.writerow(row_cells)
 
 
 def csv_files(path: str | Path | list[Path]) -> list[Path]:

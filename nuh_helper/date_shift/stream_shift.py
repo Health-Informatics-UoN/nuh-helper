@@ -101,8 +101,8 @@ def shift_excel_dates_inplace(
         sheet_configs,
         min_shift_days,
         max_shift_days,
-        load_linking_table=linking_table_path,
-        save_linking_table=linking_table_output,
+        old_linking_table=linking_table_path,
+        out_linking_table=linking_table_output,
         seed=seed,
     )
 

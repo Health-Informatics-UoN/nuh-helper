@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from nuh_helper.date_shift.defs import normalize_inplace
+from nuh_helper.book_page import normalize_row
 
 shift_ignore_t = dict[str, dict[str, set[str]]]
 
@@ -33,7 +33,7 @@ def shift_ignore_load(shift_ignore_yaml: None | Path | str) -> shift_ignore_t:
 
             for col_name, col_ignored in page_data.items():
                 shift_ignore_page[col_name.strip()] = set(
-                    normalize_inplace(col_ignored + [None])
+                    normalize_row(col_ignored + [None])
                 )
             shift_ignore_full[page_name.strip()] = shift_ignore_page
         return shift_ignore_full

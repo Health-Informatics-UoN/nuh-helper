@@ -144,19 +144,3 @@ class FoundExtraPages(Exception):
 
         self._page_names: list[str] = page_names
         self._config_names: list[str] = expected
-
-
-def normalize_inplace(row: list[str]) -> list[str]:
-    """modifies (and returns) the passed array to drop extra whitespace and replace
-    fully blank entries with None. doesn't touch non-strings"""
-
-    for idx, val in enumerate(row):
-        if isinstance(val, str):
-            val = val.strip()
-
-        if not val:
-            val = None
-
-        row[idx] = val
-
-    return row

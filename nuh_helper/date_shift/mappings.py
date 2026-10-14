@@ -69,8 +69,8 @@ def load_shift_deltas(
     sheet_configs: sheet_configs_t,
     min_shift_days: int,
     max_shift_days: int,
-    load_linking_table: str | Path | None,
-    save_linking_table: str | Path | None,
+    old_linking_table: str | Path | None,
+    out_linking_table: str | Path | None,
     seed: int | None,
 ) -> dict[str, Timedelta]:
     """load the day-offsets for patients.
@@ -92,15 +92,15 @@ def load_shift_deltas(
 
     """
 
-    if not load_linking_table:
-        load_linking_table = None
-    elif not isinstance(load_linking_table, Path):
-        load_linking_table = Path(load_linking_table)
+    if not old_linking_table:
+        old_linking_table = None
+    elif not isinstance(old_linking_table, Path):
+        old_linking_table = Path(old_linking_table)
 
-    if not save_linking_table:
-        save_linking_table = None
-    elif not isinstance(save_linking_table, Path):
-        save_linking_table = Path(save_linking_table)
+    if not out_linking_table:
+        out_linking_table = None
+    elif not isinstance(out_linking_table, Path):
+        out_linking_table = Path(out_linking_table)
 
     with book[patient_sheet] as page:
         scanner = PatientRowStateMachine(sheet_configs)
@@ -114,17 +114,14 @@ def load_shift_deltas(
         ]
 
     # load the old ids (should we remove IDs that are "gone"?)
-    if isinstance(load_linking_table, str):
-        load_linking_table = Path(load_linking_table)
-    if not load_linking_table.is_file():
+    if not old_linking_table or not old_linking_table.is_file():
         old_mappings: dict[str, int] = {}
     else:
-        with open(load_linking_table) as file:
+        with open(old_linking_table) as file:
             old_mappings: dict[str, int] = {
                 _parse._normalize_patient_id(row[0]): int(row[1])
                 for row in csv.reader(file)
                 if row and row[1] and row[1].strip() != "shift_days"
-                # if row and row[0] and row[0].strip() != "patient_id"
             }
 
     if seed:
@@ -145,11 +142,12 @@ def load_shift_deltas(
     )
 
     # store all mappings in the out file
-    save_linking_table.parent.mkdir(parents=True, exist_ok=True)
-    with open(save_linking_table, "w") as file:
-        csv.writer(file).writerows(
-            [["patient_id", "shift_days"]]
-            + [[key, all_mappings[key]] for key in sorted(all_mappings)]
-        )
+    if out_linking_table:
+        out_linking_table.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_linking_table, "w") as file:
+            csv.writer(file).writerows(
+                [["patient_id", "shift_days"]]
+                + [[key, all_mappings[key]] for key in sorted(all_mappings)]
+            )
 
     return {k: pd.Timedelta(days=all_mappings[k]) for k in all_mappings}

@@ -3,20 +3,21 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import book_page, shift_excel_dates_inplace
+from nuh_helper.book_page import normalize_row
 from nuh_helper.date_shift.defs import (
     HiddenDate,
     PatientColumnMissing,
     ShiftFoundNonDate,
 )
 
-test_data = Path(__file__).parent / "data/shift_ignore"
+test_data = Path(__file__).parent / "data" / __name__
 
 
 @pytest.mark.parametrize("use_csv", [False, True])
 def test_shift_exceptions(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -54,7 +55,7 @@ def test_shift_exceptions(use_csv: bool, tmp_path: Path) -> None:
 def test_ptid_in_date_columns(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -91,7 +92,7 @@ def test_ptid_in_date_columns(use_csv: bool, tmp_path: Path) -> None:
 def test_ptid_in_text_columns(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -128,7 +129,7 @@ def test_ptid_in_text_columns(use_csv: bool, tmp_path: Path) -> None:
 def test_columns_overlap(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -165,7 +166,7 @@ def test_columns_overlap(use_csv: bool, tmp_path: Path) -> None:
 def test_ptid_column_missing(use_csv: bool, tmp_path: Path) -> None:
     """check that misconfigurations cause an error"""
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -203,7 +204,7 @@ def test_ignore_in_date_columns(
     use_csv: bool, shift_ignore: bool, tmp_path: Path
 ) -> None:
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -235,7 +236,10 @@ def test_ignore_in_date_columns(
 
     if not shift_ignore:
         with pytest.raises(ShiftFoundNonDate) as info:
-            body(None)
+            body(
+                # instead of None - use a nonsense path to increase code coverage
+                str(tmp_path / "no-such-file.yaml")
+            )
         assert info.value._page == "page-data"
         assert info.value._row == 5
         assert info.value._col == 1
@@ -261,6 +265,7 @@ def test_ignore_in_date_columns(
             ],
             ["nuh65", "mssing", None, "this one has spaces"],
         ]
+        expected = [normalize_row(row) for row in expected]
         assert obtained == expected
 
 
@@ -270,7 +275,7 @@ def test_ignore_in_text_columns(
     use_csv: bool, shift_ignore: bool, tmp_path: Path
 ) -> None:
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -333,40 +338,10 @@ def test_ignore_in_text_columns(
         assert expected == obtained
 
 
-def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
-
-    book = {}
-
-    for page in book_page.book_open(path):
-        data = []
-
-        for row, cells in page.stream_rows():
-            assert row == len(data)
-            for idx, val in enumerate(cells):
-                if val is None:
-                    continue
-                val = str(val).strip()
-                if not val:
-                    cells[idx] = None
-                    continue
-
-                import re
-
-                pattern = r"\d{4}-\d{2}-\d{2} 00:00:00"
-                if re.fullmatch(pattern, val):
-                    val = val[:10]
-                cells[idx] = val
-            data.append(cells)
-
-        book[page.name] = data
-
-    return book
-
-
 @pytest.mark.parametrize("use_csv", [False, True])
 def test_move_to_file(use_csv: bool, tmp_path: Path) -> None:
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -412,7 +387,7 @@ def test_move_to_file(use_csv: bool, tmp_path: Path) -> None:
 @pytest.mark.parametrize("use_csv", [False, True])
 def test_skip_hole(use_csv: bool, tmp_path: Path) -> None:
 
-    linking_table_old = Path(__file__).parent / "data/shift_ignore/offsets.csv"
+    linking_table_old = test_data / "offsets.csv"
     linking_table_out = tmp_path / "linking_table_out.csv"
 
     sheet_configs = {
@@ -470,3 +445,11 @@ def src_and_out_names(
         source_file = test_data / "workbook.xlsx"
         output_path = tmp_path / "target.xlsx"
     return source_file, output_path
+
+
+def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
+
+    return {
+        page.name: [normalize_row(cells) for _, cells in page.stream_rows()]
+        for page in book_page.book_open(path)
+    }
