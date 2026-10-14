@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import UnknownPatient
+from nuh_helper.date_shift.defs import UnknownPatient
 
 test_data = (
     # i feel like test data should be in a folder following this pattern

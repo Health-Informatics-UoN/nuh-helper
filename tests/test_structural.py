@@ -3,12 +3,12 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import (
+from nuh_helper.date_shift.defs import (
     BlankColumnHasData,
     DateColumnsMissing,
-    ExtraColumn,
-    ExtraPage,
-    PageMissing,
+    ExtraColumns,
+    FoundExtraPages,
+    FoundMissingPages,
     TextColumnsMissing,
 )
 
@@ -120,7 +120,7 @@ def test_extra_column(tmp_path: Path) -> None:
         },
         "stuff": "skip",
     }
-    with pytest.raises(ExtraColumn) as info:
+    with pytest.raises(ExtraColumns) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -134,7 +134,7 @@ def test_extra_column(tmp_path: Path) -> None:
         )
 
     assert info.value._page_name == "paige"
-    assert info.value._column_name == "food"
+    assert info.value._column_names == ["food"]
 
 
 def test_text_column_missing(tmp_path: Path) -> None:
@@ -208,7 +208,7 @@ def test_page_missing(tmp_path: Path) -> None:
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(PageMissing) as info:
+    with pytest.raises(FoundMissingPages) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -221,7 +221,7 @@ def test_page_missing(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._page_name == "a-missing-page"
+    assert info.value._page_name == ["a-missing-page"]
 
 
 def test_page_extra(tmp_path: Path) -> None:
@@ -245,7 +245,7 @@ def test_page_extra(tmp_path: Path) -> None:
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(ExtraPage) as info:
+    with pytest.raises(FoundExtraPages) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -258,4 +258,4 @@ def test_page_extra(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._page_name == "stuff"
+    assert info.value._page_names == ["stuff"]

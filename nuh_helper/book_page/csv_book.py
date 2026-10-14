@@ -55,9 +55,22 @@ class CSVBook(Book):
     def stream_copy(self, into: str | Path) -> gen[tuple[str, int, list[str]]]:
         if not isinstance(into, Path):
             into = Path(into)
+        into = into.absolute()
 
         if into.is_file():
             raise RuntimeError(f"can't write csvs to {into} because it's a file")
+
+        # don't overwrite input
+        if inputs_in_there := sorted(
+            [
+                input
+                for input in self._page_files.values()
+                if str(input.absolute()).startswith(str(into))
+            ]
+        ):
+            raise RuntimeError(
+                f"can't write to {into} - there are inputs there {inputs_in_there=}"
+            )
 
         into.mkdir(parents=True, exist_ok=True)
 

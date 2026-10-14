@@ -3,7 +3,11 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import book_page, shift_excel_dates_inplace
-from nuh_helper.date_shift import HiddenDate, PatientColumnMissing, ShiftFoundNonDate
+from nuh_helper.date_shift.defs import (
+    HiddenDate,
+    PatientColumnMissing,
+    ShiftFoundNonDate,
+)
 
 test_data = Path(__file__).parent / "data/shift_ignore"
 

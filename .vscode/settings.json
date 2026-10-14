@@ -3,5 +3,14 @@
     "tests"
   ],
   "python.testing.unittestEnabled": false,
-  "python.testing.pytestEnabled": true
+  "python.testing.pytestEnabled": true,
+  "cSpell.words": [
+    "inplace",
+    "mapstream",
+    "mssing",
+    "openpyxl",
+    "ptid",
+    "pydatetime",
+    "ufeff"
+  ]
 }

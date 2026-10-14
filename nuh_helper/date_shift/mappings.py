@@ -6,8 +6,16 @@ import random
 from pathlib import Path
 
 import pandas as pd
+from pandas import Timedelta
 
+from nuh_helper.book_page import Book
 from nuh_helper.date_shift import _parse
+from nuh_helper.date_shift.defs import (
+    sheet_configs_t,
+)
+from nuh_helper.date_shift.row_machine import (
+    PatientRowStateMachine,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,37 +63,63 @@ def load_shift_mappings(csv_path: str) -> pd.DataFrame:
     return df
 
 
-def patient_shift_deltas(
-    patient_ids: list[str],
-    src_linking_table: str | Path,
-    out_linking_table: str | Path,
-    seed: int | None,
+def load_shift_deltas(
+    book: Book,
+    patient_sheet: str,
+    sheet_configs: sheet_configs_t,
     min_shift_days: int,
     max_shift_days: int,
-) -> dict[str, pd.Timedelta]:
-    """:
-    Generate random shift mappings for patient IDs, reusing known patients and saving
-        all to a file.
+    load_linking_table: str | Path | None,
+    save_linking_table: str | Path | None,
+    seed: int | None,
+) -> dict[str, Timedelta]:
+    """load the day-offsets for patients.
 
-    Args:
-        patient_ids: List of patient IDs to generate shifts for.
-        src_linking_table: where to load prior values from
-        out_linking_table: where to save teh full set to
-        seed: Optional random seed for reproducibility.
-        min_shift_days: Minimum number of days to shift (default: -15).
-        max_shift_days: Maximum number of days to shift (default: 15).
+    Args
+        - book: Bool = the CSV or XLSX workbook to read the patient ids from
+        - patient_sheet: str = the authoritatively page name with a list of patients
+            * we assert that it exists in the book
+            * rows don't need to be unique
+        - sheet_configs: the full sheet configs
+        - min_shift_days = dates are shifted up to this far back (probably negative)
+        - max_shift_days = dates can be shifted at most this forward (should be > min)
+        - linking_table_path: str | None = None,
+        - linking_table_output: str | None = None,
+        - seed = an optional seed to pass to the shift generation
 
     Returns:
         dictionary mapping 'patient_id' to a pd.Timedelta 'shift_days' which we use.
+
     """
 
+    if not load_linking_table:
+        load_linking_table = None
+    elif not isinstance(load_linking_table, Path):
+        load_linking_table = Path(load_linking_table)
+
+    if not save_linking_table:
+        save_linking_table = None
+    elif not isinstance(save_linking_table, Path):
+        save_linking_table = Path(save_linking_table)
+
+    with book[patient_sheet] as page:
+        scanner = PatientRowStateMachine(sheet_configs)
+        patient_ids: list[str] = [
+            pid.patient_id
+            for pid in [
+                scanner.next_details(page.name, row, data)
+                for row, data in page.stream_rows()
+            ]
+            if pid
+        ]
+
     # load the old ids (should we remove IDs that are "gone"?)
-    if isinstance(src_linking_table, str):
-        src_linking_table = Path(src_linking_table)
-    if not src_linking_table.is_file():
+    if isinstance(load_linking_table, str):
+        load_linking_table = Path(load_linking_table)
+    if not load_linking_table.is_file():
         old_mappings: dict[str, int] = {}
     else:
-        with open(src_linking_table) as file:
+        with open(load_linking_table) as file:
             old_mappings: dict[str, int] = {
                 _parse._normalize_patient_id(row[0]): int(row[1])
                 for row in csv.reader(file)
@@ -111,8 +145,8 @@ def patient_shift_deltas(
     )
 
     # store all mappings in the out file
-    out_linking_table.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_linking_table, "w") as file:
+    save_linking_table.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_linking_table, "w") as file:
         csv.writer(file).writerows(
             [["patient_id", "shift_days"]]
             + [[key, all_mappings[key]] for key in sorted(all_mappings)]
