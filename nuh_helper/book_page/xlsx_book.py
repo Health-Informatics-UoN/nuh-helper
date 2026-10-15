@@ -4,8 +4,9 @@ from collections.abc import Generator as gen
 from pathlib import Path
 
 import openpyxl
+from openpyxl.cell.read_only import EmptyCell
 
-from .book import Book, Page
+from .book import Book, Page, normalize_row, row_val_t
 
 
 class XLSXBook(Book):
@@ -15,12 +16,12 @@ class XLSXBook(Book):
         if not file.is_file():
             raise RuntimeError(f"xlsx file not found {file}")
         self._file = file
-        self._book = openpyxl.load_workbook(file, read_only=read_only)
+        self._book = openpyxl.load_workbook(file, read_only=read_only, data_only=True)
 
     def keys(self) -> list[str]:
         return [page.title for page in self._book.worksheets]
 
-    def _stream_copy_impl(self, into: str | Path) -> gen[tuple[str, int, list[str]]]:
+    def _stream_copy_impl(self, into: str | Path) -> gen[tuple[str, int, row_val_t]]:
         if not isinstance(into, Path):
             into = Path(into)
 
@@ -48,14 +49,19 @@ class XLSXBook(Book):
             raise KeyError("excel limits you to 31 character page names")
 
         class XLSXPage(Page):
-            def _stream_rows_impl(self) -> gen[tuple[int, list[str]]]:
-                for row in range(self._page.max_row):
+            def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
+
+                for row_idx, row_data in enumerate(self._page.iter_rows()):
                     yield (
-                        row,
-                        [
-                            self._page.cell(row + 1, col + 1).value
-                            for col in range(self._page.max_column)
-                        ],
+                        row_idx,
+                        normalize_row(
+                            [
+                                None
+                                if isinstance(cell, EmptyCell)
+                                else cell.internal_value
+                                for cell in row_data
+                            ]
+                        ),
                     )
 
         yield XLSXPage(name, self._book[name])

@@ -81,7 +81,7 @@ class Book(ABC):
                 yield page
 
 
-def normalize_val(src: object) -> object:
+def normalize_val(src: object) -> cell_val_t:
     """parse to a datetime, .strip(), turn "" into None, retain bool"""
 
     if isinstance(src, (bool | float | int | datetime | date)):
@@ -124,7 +124,7 @@ def normalize_val(src: object) -> object:
     return src
 
 
-def normalize_row(row: iterable[str]) -> list[str]:
+def normalize_row(row: iterable[str]) -> row_val_t:
     """modifies (and returns) the passed array to drop extra whitespace and replace
     fully blank entries with None. doesn't touch non-strings"""
 

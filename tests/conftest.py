@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import book_page
-from nuh_helper.book_page import normalize_row
+from nuh_helper.book_page import normalize_row, row_val_t
 
 OUTPUT_DIR = Path(__file__).parent / "output"
 
@@ -35,7 +35,9 @@ def output_path(request: pytest.FixtureRequest, tmp_path: Path) -> Path:
     return tmp_path
 
 
-def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
+def load_workbook(
+    path: str | Path,
+) -> dict[str, list[row_val_t]]:
     return {
         page.name: [normalize_row(cells) for _, cells in page.stream_rows()]
         for page in book_page.book_open(path)
