@@ -12,8 +12,9 @@ Helper library for enabling data studies: utilities for study enablement such as
 
 - **`nuh_helper.date_shift`** — Date shifting for patient data in Excel/DataFrames (consistent shifts per patient ID, reproducible via linking tables).
 - **`nuh_helper.profile`** - Profile a dataset into a Scan Report
+- **`nuh_helper.book_page`** - a library for manipulating `.xlsx` files and collections of `.csv` (or `.tsv`) files with an identical API
 
-## Usage; Date Shifting
+## Usage - date_shift
 
 ### Date shifting (basic example)
 
@@ -144,76 +145,87 @@ shift_excel_dates_inplace(
 )
 ```
 
-### Passing Non Dates (in `date_columns`)
+The function accepts the same parameters as `shift_excel_dates` except;
+
+- `date_format`
+  - not needed — the original cell format is preserved
+- `"text_columns": [???],`
+  - a per-sheet list of columns that have text only and shouldn't have dates
+  - these need to be explicitly specified to prevent extra columns in the CDM
+
+### Allowing Non Dates (in `date_columns`) and Faux Dates (data that looks like dates in text columns)
 
 Studies frequently include data that's not parsable as a date in the date columns.
-Rarely is this a typo, it can be text like `Record missing` or `2007-09-UN` to signify that information is only partially available.
-This has previously been one or two dozen entries across hundreds of cells that need to be copied to the final output unchanged.
-To accommodate this, each column in each sheet can have a fixed set of strings that are passed through as-is
+This seems to change for each study, it has been text like "`_ missing _ _`" with spaces or incomplete values like `2007-09-UN` to signify that information is only partially available.
+Studies may also include things like `120/80 mmHg` which can look like dates to the safety checks.
+
+To accommodate this, teh technician can specify a **shift_ignore** file when invoking `shift_excel_dates_inplace()`
 
 ```python
-sheet_configs = {
-    "page-data": {
-        "patient_id_col": "pid",
-        "date_columns": ["dob"],
-        "text_columns": [
-            "food",
-        ],
-        "header_row": 1,
-        "skip_rows_after_header": [],
-        "shift_ignore": {  # the parameter is here
-            "dob": [  # any column can have "as is" values added
-                "missing",  # the values are each listed here
-            ]
-        },
-    }
-}
+from nuh_helper import shift_excel_dates_inplace
 
+shift_excel_dates_inplace(
+    input_file="input.xlsx",
+    output_file="output.xlsx",
+
+    shift_ignore = "path/to/shift_ignore.yaml",
+
+    patient_sheet="patients",
+    sheet_configs=sheet_configs,
+    seed=42,
+    linking_table_output="shift_mappings.csv",
+)
 ```
 
-The intended workflow is ...
+This is a simple `.yaml` file with `page_name: column_name: [ignore_entry, "ignored entry2"]` format like this ...
 
-1. create sheet configurations
-2. execute the date shifting and note non-date values detected
-3. gradually build up the list of approved values per column
+```yaml
+page-desc:
+  glitter:
+    - can't recall the date but on 12/11/2001 they had an itchy tummy
+  foo:
+    - agreed on 21st jul 2017
+page-data:
+  dob:
+    - mssing
+```
+
+When running the shift, it's expected that the technician will ...
+
+1. execute with an empty file
+2. encounter a halt because of a value in the CDM
+3. determine if it's safe to ignore or not and
+   - add add the value to the ignore list
+   - **or** remove, modify, or otherwise handle the value
+4. gradually build up the list of approved values per column
 
 While this does require repeated manual intervention ...
 
 - It's faster than searching and restoring the fields manually
 - It doesn't sacrifice any control or the ability to inspect/detect problematic values
+- It keeps any potential patient data out of the configuration file
+  - ... as the ignore list will presumably be deleted or stored with the linking_table.csv files
 
 ### Key parameters (date shifting)
 
 - `input_file`: Path to input Excel file
 - `output_file`: Path to output Excel file with shifted dates
 - `patient_sheet`: Name of the sheet containing patient IDs
-- `patient_id_col`: Name of the column containing patient IDs
-- `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
-  - `patient_id_col`: Patient ID column name in that sheet
-  - `date_columns`: List of date column names to shift
-  - `text_columns`: List of non-date columns to ignore
-  - `header_row`: (Optional) Zero-based row index for the row that contains column names
-  - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
-  - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values.
-  - `shift_ignore`: (Optional) Dict mapping `page:{column:[values]}` to lists of values that `shift_excel_dates_inplace()` passes as-is with no manipulation or checking.
-- `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead.
-- `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead.
-
+- `patient_id_col`: Name of the column containing patient IDs (not used with `shift_excel_dates_inplace()`)
+- `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead. (not used with `shift_excel_dates_inplace()`)
+- `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead. (not used with `shift_excel_dates_inplace()`)
 - `min_shift_days` / `max_shift_days`: Range of days to shift (default: -15 to 15)
 - `linking_table_path`: (Optional) Path to existing linking table CSV for reproducibility
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
-
-#### Sheet Configs Per-Page Options
-
-- `patient_id_col`: Patient ID column name in that sheet
-- `date_columns`: List of date column names to shift
-- `text_columns`:
-  - a per-sheet list of columns that have text only and shouldn't have dates
-  - these need to be explicitly specified to prevent extra columns in the CDM
-- `header_row`: (Optional) Zero-based row index for the row that contains column names
-- `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header)
-- `pass_as_is`: (Optional) Dict mapping column names to lists of "non dates" that are passed through without being changed
+- `date_format`: (Optional, `shift_excel_dates` only) Excel date format string (e.g., ‘YYYY-MM-DD’)
+- `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
+  - `patient_id_col`: Patient ID column name in that sheet
+  - `date_columns`: List of date column names to shift
+  - `text_columns`: List of non-date columns to ignore
+  - `header_row`: (Optional) Zero-based row index for the row that contains column names (default to 0 with `shift_excel_dates_inplace()`)
+  - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header) (default to [] with `shift_excel_dates_inplace()`)
+  - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values. (not allowed with `shift_excel_dates_inplace()`)
 
 ### Excel layout (header row and merged cells)
 
@@ -232,8 +244,26 @@ Sheets can have a non-standard layout: e.g. a merged title row, then a descripti
 - Optional skip of rows after the header (e.g. data-type row) via `skip_rows_after_header`
 - Supports flexible date parsing (handles various formats and placeholders like "Unknown")
 - Reproducible shifts via linking tables
+- `shift_excel_dates_inplace`: can date-shift `.csv` files by streaming the rows rather than loading the whole file.
 
-## Usage; Dataset Profile
+### Date Shifting `.csv` Files
+
+In most cases, the process for using `shift_excel_dates_inplace()` with `.csv` or `.tsv` files is identical to working with a whole `.xlsx` file.
+
+- `input_file: str | Path | list[Path]` is read as ...
+  1. a `str` that's changed to a `Path`
+  2. a `Path` (or a `str`) that's checked for `.tsv` and `.csv` files
+  3. a `list[Path]` of `.csv` and `.tsv` files that are treated as workbook pages
+  - each must have a different stem; `foo.tsv` and `foo.csv` will cause an error
+- `output_file =` is a folder where all of the final `.csv` pages will be placed
+  - if the folder/parents are missing;l they will be created
+  - it **must not** have any of the input files
+  - the original `.csv` or `.tsv` format/extension will be used for the output pages
+
+There is technically no requirement that all of the `.csv` files be in the same folder.
+If you're date-shifting carrot-transform output, you will want to use the list of files and remove the `person_ids.tsv` and `summary_mapstream.tsv` files.
+
+## Usage - profile
 
 Profile a dataset and generate a Scan Report.
 

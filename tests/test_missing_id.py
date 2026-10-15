@@ -3,12 +3,9 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import UnknownPatient
+from nuh_helper.date_shift.defs import UnknownPatient
 
-test_data = (
-    # i feel like test data should be in a folder following this pattern
-    Path(__file__).parent / "data" / __name__
-)
+test_data = Path(__file__).parent / "data" / __name__
 
 
 def test_missing_id(tmp_path: Path) -> None:
@@ -36,8 +33,6 @@ def test_missing_id(tmp_path: Path) -> None:
 
     source_file = str(test_data / "missing-id.xlsx")
     output_path = tmp_path / "target.xlsx"
-    linking_table_old = tmp_path / "linking_table_old.csv"
-    linking_table_out = tmp_path / "linking_table_out.csv"
 
     with pytest.raises(UnknownPatient) as info:
         shift_excel_dates_inplace(
@@ -48,8 +43,8 @@ def test_missing_id(tmp_path: Path) -> None:
             min_shift_days=-20,
             max_shift_days=-1,
             seed=14333,
-            linking_table_path=str(linking_table_old),
-            linking_table_output=str(linking_table_out),
+            linking_table_path=None,
+            linking_table_output=None,
         )
 
     assert str(info.value._message) == "Unknown id='nuh006' on page='deceased'"

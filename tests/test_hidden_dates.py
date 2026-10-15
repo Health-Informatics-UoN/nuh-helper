@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import (
+from nuh_helper.date_shift.defs import (
     HiddenDate,
 )
 

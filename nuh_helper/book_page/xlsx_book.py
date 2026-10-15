@@ -20,7 +20,7 @@ class XLSXBook(Book):
     def keys(self) -> list[str]:
         return [page.title for page in self._book.worksheets]
 
-    def stream_copy(self, into: str | Path) -> gen[tuple[str, int, list[str]]]:
+    def _stream_copy_impl(self, into: str | Path) -> gen[tuple[str, int, list[str]]]:
         if not isinstance(into, Path):
             into = Path(into)
 
@@ -48,7 +48,7 @@ class XLSXBook(Book):
             raise KeyError("excel limits you to 31 character page names")
 
         class XLSXPage(Page):
-            def stream_rows(self) -> gen[tuple[int, list[str]]]:
+            def _stream_rows_impl(self) -> gen[tuple[int, list[str]]]:
                 for row in range(self._page.max_row):
                     yield (
                         row,
