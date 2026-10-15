@@ -52,6 +52,8 @@ class ShiftFoundNonDate(Exception):
 
 
 class HiddenDate(Exception):
+    perform_checks: bool = True
+
     def __init__(
         self,
         sheet_name: str,
@@ -706,16 +708,17 @@ def shift_excel_dates_inplace(
 
                 cell_value = cell_value.strip()
 
-            # check for date in the cell_value
-            for found in datefinder.find_dates(str(cell_value)):
-                raise HiddenDate(
-                    sheet_name,
-                    row_idx,
-                    patient_id_idx,
-                    patient_id_col,
-                    cell_value,
-                    found,
-                )
+            if HiddenDate.perform_checks:
+                # check for date in the cell_value
+                for found in datefinder.find_dates(str(cell_value)):
+                    raise HiddenDate(
+                        sheet_name,
+                        row_idx,
+                        patient_id_idx,
+                        patient_id_col,
+                        cell_value,
+                        found,
+                    )
 
             pid = _parse._normalize_patient_id(cell_value)
             if pid is None:
@@ -789,26 +792,29 @@ def shift_excel_dates_inplace(
 
                 # for text columns, we now *just* need to check for a hidden date
                 if col_name in text_columns:
-                    # check for dates in non-date columns
-                    for found in datefinder.find_dates(str(cell_value)):
-                        logger.debug(
-                            f"found hidden date {sheet_name=}/{col_name=}:{cell_value}"
-                        )
-                        ignored = shift_ignore[sheet_name][col_name]
-                        logger.debug(
-                            f"shift_ignore[{sheet_name=}][{col_name=}]= {len(ignored)}"
-                        )
-                        for ig in ignored:
-                            logger.debug(f"- {ig}")
+                    if HiddenDate.perform_checks:
+                        # check for dates in non-date columns
+                        for found in datefinder.find_dates(str(cell_value)):
+                            logger.debug(
+                                f"found hidden date {sheet_name=}/{col_name=}:"
+                                + f"{cell_value}"
+                            )
+                            ignored = shift_ignore[sheet_name][col_name]
+                            logger.debug(
+                                f"shift_ignore[{sheet_name=}][{col_name=}]="
+                                + f" {len(ignored)}"
+                            )
+                            for ig in ignored:
+                                logger.debug(f"- {ig}")
 
-                        raise HiddenDate(
-                            sheet_name,
-                            row_idx,
-                            col_idx,
-                            col_name,
-                            cell_value,
-                            found,
-                        )
+                            raise HiddenDate(
+                                sheet_name,
+                                row_idx,
+                                col_idx,
+                                col_name,
+                                cell_value,
+                                found,
+                            )
                     cell.value = cell_value
                     continue
 

@@ -49,7 +49,8 @@ def test_iso8601(tmp_path: Path) -> None:
     )
 
 
-def test_us_date(tmp_path: Path) -> None:
+@pytest.mark.parametrize("bypass", [True, False])
+def test_us_date(bypass: bool, tmp_path: Path) -> None:
 
     source_file = Path(__file__).parent / "data/hidden_dates/us_date.xlsx"
     output_path = tmp_path / "target.xlsx"
@@ -69,7 +70,8 @@ def test_us_date(tmp_path: Path) -> None:
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(HiddenDate) as info:
+
+    def shift() -> None:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
@@ -82,11 +84,24 @@ def test_us_date(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == (
-        "hidden date in [sheet_name='data', 5, 2 @ diagnosis]"
-        + ' value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
-        + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
-    )
+    assert HiddenDate.perform_checks
+
+    if bypass:
+        try:
+            HiddenDate.perform_checks = False
+            shift()
+        finally:
+            HiddenDate.perform_checks = True
+    else:
+        with pytest.raises(HiddenDate) as info:
+            shift()
+
+        assert info.value._message == (
+            "hidden date in [sheet_name='data', 5, 2 @ diagnosis]"
+            + " value=\"can't recall the date but "
+            + 'on 12/11/2001 they had an itchy tummy"'
+            + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
+        )
 
 
 def test_written(tmp_path: Path) -> None:
