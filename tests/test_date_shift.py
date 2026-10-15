@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from conftest import load_workbook
 from openpyxl import Workbook
 
+from nuh_helper.book_page.book import normalize_row
 from nuh_helper.date_shift import (
     generate_shift_mappings,
     shift_excel_dates_inplace,
@@ -276,6 +278,17 @@ class TestShiftExcelDatesExceptionsIntegration:
             shift_ignore_yaml=test_data / "shift-ignore.yaml",
             seed=42,
         )
+        expected = {
+            "patients": [
+                normalize_row(["patient_id", "last_alive"]),
+                normalize_row(["P001", "2023-06-06"]),
+                normalize_row(["P002", "2024-12-31"]),
+            ],
+        }
+        obtained = load_workbook(out)
+
+        assert obtained == expected
+        raise Exception(out)
         df = pd.read_excel(str(out), sheet_name="patients")
         p001_date = df.loc[df["patient_id"] == "P001", "last_alive"].iloc[0]
         p002_date = df.loc[df["patient_id"] == "P002", "last_alive"].iloc[0]

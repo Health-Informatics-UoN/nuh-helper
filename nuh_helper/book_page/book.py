@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator as gen
-from collections.abc import Iterable as iterator
+from collections.abc import Iterable as iterable
 from datetime import date, datetime
 from functools import cached_property
 from pathlib import Path
@@ -17,7 +17,7 @@ class Page(ABC):
     @abstractmethod
     def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        ...
+        raise NotImplementedError()
 
     def stream_rows(self) -> gen[tuple[int, row_val_t]]:
         """public method for reading a RO stream of rows from a specific page"""
@@ -38,10 +38,12 @@ class Book(ABC):
         return name in self.keys()
 
     @abstractmethod
-    def __getitem__(self, name: str) -> gen[Page]: ...
+    def __getitem__(self, name: str) -> gen[Page]:
+        raise NotImplementedError()
 
     @abstractmethod
-    def keys(self) -> iterator[str]: ...
+    def keys(self) -> iterable[str]:
+        raise NotImplementedError()
 
     @abstractmethod
     def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
@@ -122,7 +124,7 @@ def normalize_val(src: object) -> object:
     return src
 
 
-def normalize_row(row: list[str]) -> list[str]:
+def normalize_row(row: iterable[str]) -> list[str]:
     """modifies (and returns) the passed array to drop extra whitespace and replace
     fully blank entries with None. doesn't touch non-strings"""
 
