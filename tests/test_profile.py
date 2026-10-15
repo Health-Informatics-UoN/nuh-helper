@@ -7,6 +7,8 @@ from openpyxl import load_workbook
 
 from nuh_helper.profile import FieldTypeInfo, generate_scan_report
 
+test_data = Path(__file__).parent / "data" / __name__
+
 
 def _field_type(values: list[str]) -> str:
     info = FieldTypeInfo()
@@ -99,7 +101,7 @@ def test_has_bom(
             [
                 str(csv_path),
                 # this one does have a BOM which ends up in the final
-                str(Path(__file__).parent / "data/passed/offsets.csv"),
+                str(test_data / "shift_mappings.csv"),
             ],
             output_path=str(tmp_path / "report-1.xlsx"),
         )
@@ -108,7 +110,7 @@ def test_has_bom(
             [
                 str(csv_path),
                 # this one does have a BOM which ends up in the final
-                str(Path(__file__).parent / "data/passed/offsets.csv"),
+                str(test_data / "shift_mappings.csv"),
             ],
             output_path=str(tmp_path / "report-1.xlsx"),
             remove_bom=remove_bom,
@@ -119,14 +121,14 @@ def test_has_bom(
     for name in book.sheetnames:
         if not name.endswith(".csv"):
             continue
-        assert name == "offsets.csv" or name == "patients.csv"
+        assert name == "shift_mappings.csv" or name == "patients.csv"
 
         page = book[name]
 
         if name == "patients.csv":
             assert str(page.cell(row=1, column=1).value)[0] == "p"
 
-        if name == "offsets.csv":
+        if name == "shift_mappings.csv":
             if remove_bom is None or remove_bom:
                 assert str(page.cell(row=1, column=1).value)[0] == "p"
             else:
