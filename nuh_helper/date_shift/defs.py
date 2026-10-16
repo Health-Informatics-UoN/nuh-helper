@@ -85,6 +85,8 @@ class ShiftFoundNonDate(Exception):
 
 
 class HiddenDate(ValueError):
+    perform_checks: bool = True
+
     def __init__(
         self,
         sheet_name: str,

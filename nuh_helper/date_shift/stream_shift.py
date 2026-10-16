@@ -177,14 +177,15 @@ def _shift_cell(
                     f"found hidden date {detail.page_name=}/{col_name=}"
                     + f":{cell_value}"
                 )
-                raise HiddenDate(
-                    detail.page_name,
-                    detail.row_idx,
-                    col_idx,
-                    col_name,
-                    cell_value,
-                    found,
-                )
+                if HiddenDate.perform_checks:
+                    raise HiddenDate(
+                        detail.page_name,
+                        detail.row_idx,
+                        col_idx,
+                        col_name,
+                        cell_value,
+                        found,
+                    )
         case ColumnType.DATE:
             # cell_value can be str | datetime | date
             # ... so parsed might not always succeed

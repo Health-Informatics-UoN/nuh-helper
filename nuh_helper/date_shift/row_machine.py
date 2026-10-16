@@ -213,14 +213,17 @@ class PatientRowStateMachine:
 
         # check for date in the patient_id
         for found in datefinder.find_dates(str(patient_id)):
-            raise HiddenDate(
-                sheet_name,
-                row_idx,
-                self._detail_archetype.patient_id_idx,
-                self._detail_archetype.patient_id_col,
-                patient_id,
-                found,
-            )
+            logger.debug(f"found hidden date {sheet_name=} {patient_id=}")
+
+            if HiddenDate.perform_checks:
+                raise HiddenDate(
+                    sheet_name,
+                    row_idx,
+                    self._detail_archetype.patient_id_idx,
+                    self._detail_archetype.patient_id_col,
+                    patient_id,
+                    found,
+                )
 
         patient_id = _parse._normalize_patient_id(patient_id)
         if patient_id is None:
