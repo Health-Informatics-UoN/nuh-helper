@@ -4,7 +4,7 @@ from typing import Literal, Never
 
 import pytest
 
-from nuh_helper.book_page import Book, CSVBook, XLSXBook, book_open
+from nuh_helper.book_page import BaseWorkBook, CSVWorkBook, XLSXWorkBook, book_open
 
 test_data = (
     # i feel like test data should be in a folder following this pattern
@@ -31,7 +31,7 @@ data_3x6 = [
 
 def test_csv_name_collision() -> None:
     with pytest.raises(ValueError) as error:
-        CSVBook([test_book / "data_3x4.csv", test_book / "data_3x4.tsv"])
+        CSVWorkBook([test_book / "data_3x4.csv", test_book / "data_3x4.tsv"])
     assert (
         textwrap.dedent(
             f"""
@@ -49,8 +49,8 @@ def test_csv_name_collision() -> None:
 @pytest.mark.parametrize(
     "kind, path",
     [
-        (CSVBook, test_book),
-        (XLSXBook, test_book / "data.xlsx"),
+        (CSVWorkBook, test_book),
+        (XLSXWorkBook, test_book / "data.xlsx"),
     ],
 )
 @pytest.mark.parametrize(
@@ -69,7 +69,7 @@ def test_csv_name_collision() -> None:
     ],
 )
 def test_read_data(
-    kind: CSVBook | XLSXBook,
+    kind: CSVWorkBook | XLSXWorkBook,
     path: Path,
     to_str: bool,
     generic: bool,
@@ -78,7 +78,7 @@ def test_read_data(
 ) -> None:
 
     # arrange
-    book: Book
+    book: BaseWorkBook
 
     # act
     if generic:
@@ -100,8 +100,8 @@ def test_read_data(
 @pytest.mark.parametrize(
     "kind, path",
     [
-        (CSVBook, test_book),
-        (XLSXBook, test_book / "data.xlsx"),
+        (CSVWorkBook, test_book),
+        (XLSXWorkBook, test_book / "data.xlsx"),
     ],
 )
 @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ def test_copy_book(
     data: list[list[str]],
 ) -> None:
     # arrange
-    source: Book
+    source: BaseWorkBook
     changed_data = [
         [f"edit[{r},{c}]{data[r][c]}" for c in range(len(data[0]))]
         for r in range(len(data))
@@ -159,7 +159,7 @@ def test_copy_book(
             cells[col] = f"edit[{row},{col}]{val}"
 
     # assert
-    target: Book
+    target: BaseWorkBook
     target = book_open(end) if generic_open else kind(end)
 
     # assert
@@ -177,7 +177,7 @@ def test_copy_book(
 
 
 def test_stream_csv_rows() -> None:
-    book = CSVBook([test_book / "data_3x4.csv", test_book / "data_3x6.tsv"])
+    book = CSVWorkBook([test_book / "data_3x4.csv", test_book / "data_3x6.tsv"])
 
     copy = []
     with book["data_3x4"] as page:
@@ -188,7 +188,7 @@ def test_stream_csv_rows() -> None:
 
 
 def test_csv_stream_wont_overwrite_file(tmp_path: Path) -> None:
-    book = CSVBook([test_book / "data_3x4.csv", test_book / "data_3x6.tsv"])
+    book = CSVWorkBook([test_book / "data_3x4.csv", test_book / "data_3x6.tsv"])
     into = tmp_path / "foo"
     into.write_text("foobar")
 
@@ -202,8 +202,8 @@ def test_csv_stream_wont_overwrite_file(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "kind, path",
     [
-        (CSVBook, [test_book / "data_3x4.csv", test_book / "data_3x6.tsv"]),
-        (XLSXBook, test_book / "data.xlsx"),
+        (CSVWorkBook, [test_book / "data_3x4.csv", test_book / "data_3x6.tsv"]),
+        (XLSXWorkBook, test_book / "data.xlsx"),
     ],
 )
 def test_stream_rows(kind: type, path: Path) -> None:
@@ -226,10 +226,10 @@ def test_stream_rows(kind: type, path: Path) -> None:
 
 def test_non_file(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError) as error:
-        XLSXBook(tmp_path / "foo.xlsx")
+        XLSXWorkBook(tmp_path / "foo.xlsx")
     assert f"xlsx file not found {tmp_path}/foo.xlsx" == str(error.value)
     with pytest.raises(RuntimeError) as error:
-        for _ in XLSXBook(tmp_path / "bar.xlsx").stream_copy(tmp_path / "foo.xlsx"):
+        for _ in XLSXWorkBook(tmp_path / "bar.xlsx").stream_copy(tmp_path / "foo.xlsx"):
             pytest.fail("this should have raised an exception")
     assert f"xlsx file not found {tmp_path}/bar.xlsx" == str(error.value)
 
@@ -238,12 +238,12 @@ def test_csv_file() -> None:
     path = test_book / "data.xlsx"
 
     with pytest.raises(RuntimeError) as error:
-        CSVBook(path)
+        CSVWorkBook(path)
     assert f"need a dir or list of files, but, got a file {path=}" == str(error.value)
 
 
 def test_xlsx_name_cap() -> Never:
-    book = XLSXBook(test_book / "data.xlsx")
+    book = XLSXWorkBook(test_book / "data.xlsx")
     long_name = "name which exceeds 31 characters"
     with (
         pytest.raises(KeyError) as error,
@@ -254,7 +254,7 @@ def test_xlsx_name_cap() -> Never:
 
 
 def test_bom_is_removed() -> None:
-    book = CSVBook([test_data / "page-desc.csv"])
+    book = CSVWorkBook([test_data / "page-desc.csv"])
 
     obtained = []
     with book["page-desc"] as page:

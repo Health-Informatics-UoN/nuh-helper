@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 from pandas import Timedelta
 
-from nuh_helper.book_page import Book
+from nuh_helper.book_page import BaseWorkBook
 from nuh_helper.date_shift import _parse
 from nuh_helper.date_shift.defs import (
     sheet_configs_t,
@@ -64,7 +64,7 @@ def load_shift_mappings(csv_path: str) -> pd.DataFrame:
 
 
 def load_shift_deltas(
-    book: Book,
+    book: BaseWorkBook,
     patient_sheet: str,
     sheet_configs: sheet_configs_t,
     min_shift_days: int,

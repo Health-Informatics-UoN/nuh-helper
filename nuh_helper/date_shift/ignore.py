@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from nuh_helper.book_page import normalize_row
+from nuh_helper.book_page import BaseWorkBook, normalize_row
 
 shift_ignore_t = dict[str, dict[str, set[str]]]
 
@@ -32,8 +32,9 @@ def shift_ignore_load(shift_ignore_yaml: None | Path | str) -> shift_ignore_t:
             shift_ignore_page = {}
 
             for col_name, col_ignored in page_data.items():
-                shift_ignore_page[col_name.strip()] = set(
-                    normalize_row(col_ignored + [None])
-                )
+                col_ignored = col_ignored + [None]
+                if BaseWorkBook.normalize_values:
+                    col_ignored = normalize_row(col_ignored)
+                shift_ignore_page[col_name.strip()] = set(col_ignored)
             shift_ignore_full[page_name.strip()] = shift_ignore_page
         return shift_ignore_full

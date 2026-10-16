@@ -6,7 +6,7 @@ from typing import Any, cast
 import datefinder
 from pandas import Timedelta
 
-from nuh_helper.book_page import Book, book_open
+from nuh_helper.book_page import BaseWorkBook, book_open
 from nuh_helper.date_shift import _parse, mappings
 from nuh_helper.date_shift.defs import (
     BlankColumnHasData,
@@ -81,7 +81,7 @@ def shift_excel_dates_inplace(
         + f"{min_shift_days=} {max_shift_days=} {seed=}"
     )
 
-    book: Book = book_open(input_file)
+    book: BaseWorkBook = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
 
     # check for missing sheets

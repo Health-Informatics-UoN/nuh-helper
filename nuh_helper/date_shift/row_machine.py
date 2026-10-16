@@ -14,7 +14,7 @@ from typing import Literal, cast
 
 import datefinder
 
-from nuh_helper.book_page import Book, normalize_row
+from nuh_helper.book_page import BaseWorkBook, normalize_row
 from nuh_helper.date_shift import _parse
 from nuh_helper.date_shift.defs import (
     DateColumnsMissing,
@@ -253,7 +253,7 @@ class PatientRowStateMachine:
             row_cells=row_cells,
         )
 
-    def book_copy(scanner, book: Book, output_file: Path) -> gen[PatientRow]:
+    def book_copy(scanner, book: BaseWorkBook, output_file: Path) -> gen[PatientRow]:
         for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
             # check if we're in a patient row, and, yield the row details if so
             detail = scanner.next_details(sheet_name, row_idx, row_cells)
