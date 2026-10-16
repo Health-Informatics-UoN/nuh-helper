@@ -86,7 +86,7 @@ class Book(ABC):
 def normalize_val(src: object) -> object:
     """parse to a datetime, .strip(), turn "" into None, retain bool"""
 
-    if isinstance(src, (bool | float | int | datetime | date)):
+    if isinstance(src, (bool | float | int | datetime | date)) or not Book.normalize:
         return src
 
     if isinstance(src, str):
