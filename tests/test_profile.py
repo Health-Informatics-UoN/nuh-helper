@@ -99,7 +99,7 @@ def test_has_bom(
             [
                 str(csv_path),
                 # this one does have a BOM which ends up in the final
-                str(Path(__file__).parent / "data/passed/offsets.csv"),
+                str(Path(__file__).parent / "data/test_shift_ignore/offsets.csv"),
             ],
             output_path=str(tmp_path / "report-1.xlsx"),
         )
@@ -108,7 +108,7 @@ def test_has_bom(
             [
                 str(csv_path),
                 # this one does have a BOM which ends up in the final
-                str(Path(__file__).parent / "data/passed/offsets.csv"),
+                str(Path(__file__).parent / "data/test_shift_ignore/offsets.csv"),
             ],
             output_path=str(tmp_path / "report-1.xlsx"),
             remove_bom=remove_bom,
