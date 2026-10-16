@@ -215,7 +215,7 @@ class PatientRowStateMachine:
 
         # check for date in the patient_id
         for found in datefinder.find_dates(str(patient_id)):
-            logger.debug(f"found hidden date {sheet_name=} {patient_id=}")
+            logger.debug("found hidden date in patient_id field %s", sheet_name)
 
             if HiddenDate.perform_checks:
                 raise HiddenDate(
