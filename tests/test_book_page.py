@@ -94,12 +94,12 @@ def test_read_data(
     # assert
     assert isinstance(book, kind)
     assert name in book
-    with book[name] as page:
-        copy = []
-        for _, row in page.stream_rows():
-            copy.append([str(c) for c in row])
+    page = book[name]
+    copy = []
+    for _, row in page.stream_rows():
+        copy.append([str(c) for c in row])
 
-        assert data == copy
+    assert data == copy
 
 
 @pytest.mark.parametrize(
@@ -173,21 +173,21 @@ def test_copy_book(
     assert isinstance(source, kind)
     assert isinstance(target, kind)
 
-    with target[name] as page:
-        copy = []
-        for row, cell in page.stream_rows():
-            assert len(copy) == row
-            copy.append(cell)
-        assert copy == changed_data
+    page = target[name]
+    copy = []
+    for row, cell in page.stream_rows():
+        assert len(copy) == row
+        copy.append(cell)
+    assert copy == changed_data
 
 
 def test_stream_csv_rows() -> None:
     book = CSVWorkBook([test_book / "data_3x4.csv", test_book / "data_3x6.tsv"])
 
     copy = []
-    with book["data_3x4"] as page:
-        for _, row in page.stream_rows():
-            copy.append(row.copy())
+    page = book["data_3x4"]
+    for _, row in page.stream_rows():
+        copy.append(row.copy())
 
     assert copy == data_3x4
 
@@ -262,10 +262,10 @@ def test_bom_is_removed() -> None:
     book = CSVWorkBook([test_data / "page-desc.csv"])
 
     obtained = []
-    with book["page-desc"] as page:
-        for idx, row in page.stream_rows():
-            assert idx == len(obtained)
-            obtained.append(row.copy())
+    page = book["page-desc"]
+    for idx, row in page.stream_rows():
+        assert idx == len(obtained)
+        obtained.append(row.copy())
 
     expected = [
         ["foo", "pid", "glitter"],

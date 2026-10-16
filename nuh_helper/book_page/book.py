@@ -41,7 +41,7 @@ class BaseWorkBook(ABC):
         return name in self.keys()
 
     @abstractmethod
-    def __getitem__(self, name: str) -> gen[BasePage]: ...
+    def __getitem__(self, name: str) -> BasePage: ...
 
     @abstractmethod
     def keys(self) -> iterable[str]: ...
@@ -82,8 +82,7 @@ class BaseWorkBook(ABC):
 
     def __iter__(self) -> gen[BasePage]:
         for name in self.keys():
-            with self[name] as page:
-                yield page
+            yield self[name]
 
 
 def normalize_val(src: object) -> cell_val_t:

@@ -1,4 +1,3 @@
-import contextlib
 import shutil
 from collections.abc import Generator as gen
 from pathlib import Path
@@ -42,7 +41,6 @@ class XLSXWorkBook(BaseWorkBook):
                         page.cell(r + 1, c + 1).value = val
         the_copy.save(into)
 
-    @contextlib.contextmanager
     def __getitem__(self, name: str) -> gen[BasePage]:
 
         if len(name) > 31:
@@ -59,4 +57,4 @@ class XLSXWorkBook(BaseWorkBook):
                         ],
                     )
 
-        yield XLSXPage(name, self._book[name])
+        return XLSXPage(name, self._book[name])
