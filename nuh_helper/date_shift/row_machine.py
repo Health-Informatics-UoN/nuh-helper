@@ -4,6 +4,7 @@ While the book_page API is meant to be generic, this is certainly not - so it's 
 the shift module.
 """
 
+import datetime as dt
 import logging
 from collections.abc import Generator as gen
 from dataclasses import dataclass, replace
@@ -13,7 +14,7 @@ from typing import Literal, cast
 
 import datefinder
 
-from nuh_helper.book_page import Book, normalize_row
+from nuh_helper.book_page import BaseWorkBook, normalize_row
 from nuh_helper.date_shift import _parse
 from nuh_helper.date_shift.defs import (
     DateColumnsMissing,
@@ -55,17 +56,41 @@ class PatientRow:
     ) -> bool:
         """determine what we should do for a given column"""
 
-        ignored: set[None | str] = shift_ignore.get(self.page_name, {}).get(
-            col_name, {None, ""}
+        # values we ignore in this column
+        ignored: set[None | str | dt.date | dt.datetime] = shift_ignore.get(
+            self.page_name, {}
+        ).get(col_name, {None, "", "NULL", "None"})
+
+        # we need these as well
+        ignored = (
+            list(ignored)
+            + [
+                # add date -> datetime(00:00)
+                dt.datetime(each.year, each.month, each.day)
+                for each in ignored
+                if isinstance(each, dt.date)
+            ]
+            + [
+                # add datetime(00:00) -> date
+                dt.date(each.year, each.month, each.day)
+                for each in ignored
+                if isinstance(each, dt.datetime)
+                and each.hour == 0
+                and each.minute == 0
+                and each.second == 0
+            ]
         )
 
-        return (
-            ColumnType.IGNORE
-            if cell_value in ignored
-            else ColumnType.TEXT
-            if col_name in self.text_columns
-            else ColumnType.DATE
-        )
+        if cell_value in ignored:
+            return ColumnType.IGNORE
+
+        if col_name in self.text_columns:
+            return ColumnType.TEXT
+
+        if cell_value == "NULL":
+            return ColumnType.IGNORE
+
+        return ColumnType.DATE
 
 
 class PatientRowStateMachine:
@@ -213,17 +238,20 @@ class PatientRowStateMachine:
 
         # check for date in the patient_id
         for found in datefinder.find_dates(str(patient_id)):
-            raise HiddenDate(
-                sheet_name,
-                row_idx,
-                self._detail_archetype.patient_id_idx,
-                self._detail_archetype.patient_id_col,
-                patient_id,
-                found,
-            )
+            logger.debug("found hidden date in patient_id field %s", sheet_name)
+
+            if HiddenDate.perform_checks:
+                raise HiddenDate(
+                    sheet_name,
+                    row_idx,
+                    self._detail_archetype.patient_id_idx,
+                    self._detail_archetype.patient_id_col,
+                    patient_id,
+                    found,
+                )
 
         patient_id = _parse._normalize_patient_id(patient_id)
-        if patient_id is None:
+        if patient_id is None or patient_id == "NULL":
             # if the pid is None; the rest of the row should be None as well
             if non_blank := [
                 cell
@@ -248,9 +276,9 @@ class PatientRowStateMachine:
             row_cells=row_cells,
         )
 
-    def book_copy(scanner, book: Book, output_file: Path) -> gen[PatientRow]:
+    def book_copy(self, book: BaseWorkBook, output_file: Path) -> gen[PatientRow]:
         for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
             # check if we're in a patient row, and, yield the row details if so
-            detail = scanner.next_details(sheet_name, row_idx, row_cells)
+            detail = self.next_details(sheet_name, row_idx, row_cells)
             if detail:
                 yield detail

@@ -4,12 +4,13 @@ to be in one "root" file.
 """
 
 from datetime import datetime
+from typing import Literal
 
 # each entry in a sheet config will match this
 _sheet_config_row_t = str | int | list[str] | dict[str, set[str] | list[str]]
 
 # a single sheet will consist of this config
-_sheet_config_single_t = dict[str, _sheet_config_row_t]
+_sheet_config_single_t = dict[str, _sheet_config_row_t] | Literal["skip"]
 
 # the whole configuration for a shift workbook will have this type
 sheet_configs_t = dict[str, _sheet_config_single_t]
@@ -85,6 +86,8 @@ class ShiftFoundNonDate(Exception):
 
 
 class HiddenDate(ValueError):
+    perform_checks: bool = True
+
     def __init__(
         self,
         sheet_name: str,

@@ -9,7 +9,7 @@ cell_val_t = None | str | date | datetime
 row_val_t = list[cell_val_t]
 
 
-class Page(ABC):
+class BasePage(ABC):
     def __init__(self, name: str, page: object) -> None:
         self._name = name
         self._page = page
@@ -17,14 +17,15 @@ class Page(ABC):
     @abstractmethod
     def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        raise NotImplementedError()
+        pass
 
     def stream_rows(self) -> gen[tuple[int, row_val_t]]:
         """public method for reading a RO stream of rows from a specific page"""
 
         for row_idx, row_data in self._stream_rows_impl():
-            for raw_idx, raw_val in enumerate(row_data):
-                row_data[raw_idx] = normalize_val(raw_val)
+            if BaseWorkBook.normalize_values:
+                for raw_idx, raw_val in enumerate(row_data):
+                    row_data[raw_idx] = normalize_val(raw_val)
 
             yield row_idx, row_data
 
@@ -33,22 +34,24 @@ class Page(ABC):
         return self._name
 
 
-class Book(ABC):
+class BaseWorkBook(ABC):
+    normalize_values: bool = True
+
     def __contains__(self, name: str) -> bool:
         return name in self.keys()
 
     @abstractmethod
-    def __getitem__(self, name: str) -> gen[Page]:
-        raise NotImplementedError()
+    def __getitem__(self, name: str) -> gen[BasePage]:
+        pass
 
     @abstractmethod
     def keys(self) -> iterable[str]:
-        raise NotImplementedError()
+        pass
 
     @abstractmethod
     def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        ...
+        pass
 
     def stream_copy(
         self,
@@ -68,14 +71,18 @@ class Book(ABC):
         date_format = date_format if date_format else "%Y-%m-%d"
 
         for page_name, row_idx, row_data in self._stream_copy_impl(into):
+            if BaseWorkBook.normalize_values:
+                for raw_idx, raw_val in enumerate(row_data):
+                    row_data[raw_idx] = normalize_val(raw_val)
             yield page_name, row_idx, row_data
-            for raw_idx, raw_val in enumerate(row_data):
-                if isinstance(raw_val, date):
-                    row_data[raw_idx] = raw_val.strftime(date_format)
-                elif isinstance(raw_val, datetime):
-                    row_data[raw_idx] = raw_val.strftime(time_format)
+            if BaseWorkBook.normalize_values:
+                for raw_idx, raw_val in enumerate(row_data):
+                    if isinstance(raw_val, date):
+                        row_data[raw_idx] = raw_val.strftime(date_format)
+                    elif isinstance(raw_val, datetime):
+                        row_data[raw_idx] = raw_val.strftime(time_format)
 
-    def __iter__(self) -> gen[Page]:
+    def __iter__(self) -> gen[BasePage]:
         for name in self.keys():
             with self[name] as page:
                 yield page
@@ -84,7 +91,10 @@ class Book(ABC):
 def normalize_val(src: object) -> cell_val_t:
     """parse to a datetime, .strip(), turn "" into None, retain bool"""
 
-    if isinstance(src, (bool | float | int | datetime | date)):
+    if (
+        isinstance(src, (bool | float | int | datetime | date))
+        or not BaseWorkBook.normalize_values
+    ):
         return src
 
     if isinstance(src, str):

@@ -6,7 +6,7 @@ from typing import Any, cast
 import datefinder
 from pandas import Timedelta
 
-from nuh_helper.book_page import Book, book_open
+from nuh_helper.book_page import BaseWorkBook, book_open
 from nuh_helper.date_shift import _parse, mappings
 from nuh_helper.date_shift.defs import (
     BlankColumnHasData,
@@ -81,7 +81,7 @@ def shift_excel_dates_inplace(
         + f"{min_shift_days=} {max_shift_days=} {seed=}"
     )
 
-    book: Book = book_open(input_file)
+    book: BaseWorkBook = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
 
     # check for missing sheets
@@ -177,14 +177,15 @@ def _shift_cell(
                     f"found hidden date {detail.page_name=}/{col_name=}"
                     + f":{cell_value}"
                 )
-                raise HiddenDate(
-                    detail.page_name,
-                    detail.row_idx,
-                    col_idx,
-                    col_name,
-                    cell_value,
-                    found,
-                )
+                if HiddenDate.perform_checks:
+                    raise HiddenDate(
+                        detail.page_name,
+                        detail.row_idx,
+                        col_idx,
+                        col_name,
+                        cell_value,
+                        found,
+                    )
         case ColumnType.DATE:
             # cell_value can be str | datetime | date
             # ... so parsed might not always succeed

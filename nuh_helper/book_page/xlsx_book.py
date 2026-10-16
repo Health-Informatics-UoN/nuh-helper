@@ -6,10 +6,10 @@ from pathlib import Path
 import openpyxl
 from openpyxl.cell.read_only import EmptyCell
 
-from .book import Book, Page, normalize_row, row_val_t
+from .book import BasePage, BaseWorkBook, row_val_t
 
 
-class XLSXBook(Book):
+class XLSXWorkBook(BaseWorkBook):
     def __init__(self, file: str | Path, read_only: bool = True) -> None:
         if isinstance(file, str):
             file = Path(file)
@@ -43,25 +43,20 @@ class XLSXBook(Book):
         the_copy.save(into)
 
     @contextlib.contextmanager
-    def __getitem__(self, name: str) -> gen[Page]:
+    def __getitem__(self, name: str) -> gen[BasePage]:
 
         if len(name) > 31:
             raise KeyError("excel limits you to 31 character page names")
 
-        class XLSXPage(Page):
-            def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
-
+        class XLSXPage(BasePage):
+            def _stream_rows_impl(self) -> gen[tuple[int, list[str]]]:
                 for row_idx, row_data in enumerate(self._page.iter_rows()):
                     yield (
                         row_idx,
-                        normalize_row(
-                            [
-                                None
-                                if isinstance(cell, EmptyCell)
-                                else cell.internal_value
-                                for cell in row_data
-                            ]
-                        ),
+                        [
+                            None if isinstance(cell, EmptyCell) else cell.internal_value
+                            for cell in row_data
+                        ],
                     )
 
         yield XLSXPage(name, self._book[name])

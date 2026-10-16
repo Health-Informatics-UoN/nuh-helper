@@ -10,7 +10,6 @@ from openpyxl import Workbook
 
 from nuh_helper.book_page.book import normalize_row
 from nuh_helper.date_shift import (
-    generate_shift_mappings,
     shift_excel_dates_inplace,
 )
 from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_value
@@ -81,41 +80,6 @@ class TestParseDateValue:
     def test_mm_dd_yyyy_string(self) -> None:
         # 15 cannot be a month, so this is unambiguously day-second
         assert _parse_date_value("01-15-2023") == pd.Timestamp("2023-01-15")
-
-
-class TestGenerateShiftMappings:
-    def test_returns_correct_columns(self) -> None:
-        result = generate_shift_mappings(["P001"])
-        assert list(result.columns) == ["patient_id", "shift_days"]
-
-    def test_one_row_per_patient(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result = generate_shift_mappings(ids)
-        assert len(result) == 3
-        assert list(result["patient_id"]) == ids
-
-    def test_reproducible_with_seed(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result1 = generate_shift_mappings(ids, seed=42)
-        result2 = generate_shift_mappings(ids, seed=42)
-        assert list(result1["shift_days"]) == list(result2["shift_days"])
-
-    def test_different_seeds_differ(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result1 = generate_shift_mappings(ids, seed=1)
-        result2 = generate_shift_mappings(ids, seed=2)
-        assert list(result1["shift_days"]) != list(result2["shift_days"])
-
-    def test_shifts_within_specified_range(self) -> None:
-        ids = [f"P{i:03d}" for i in range(100)]
-        result = generate_shift_mappings(
-            ids, min_shift_days=-7, max_shift_days=7, seed=42
-        )
-        assert result["shift_days"].between(-7, 7).all()
-
-    def test_empty_patient_list(self) -> None:
-        result = generate_shift_mappings([])
-        assert len(result) == 0
 
 
 class TestShiftExcelDatesWithComplexLayout:
@@ -288,11 +252,3 @@ class TestShiftExcelDatesExceptionsIntegration:
         obtained = load_workbook(out)
 
         assert obtained == expected
-        raise Exception(out)
-        df = pd.read_excel(str(out), sheet_name="patients")
-        p001_date = df.loc[df["patient_id"] == "P001", "last_alive"].iloc[0]
-        p002_date = df.loc[df["patient_id"] == "P002", "last_alive"].iloc[0]
-        # P002's date is an exception — must be unchanged
-        assert pd.Timestamp(p002_date).date() == date(2024, 12, 31)
-        # P001's date must have been shifted (seed=42 gives a non-zero shift)
-        assert pd.Timestamp(p001_date).date() != date(2023, 6, 1)

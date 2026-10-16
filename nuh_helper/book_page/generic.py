@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from .book import Page
-from .csv_book import CSVBook
-from .xlsx_book import XLSXBook
+from .book import BasePage
+from .csv_book import CSVWorkBook
+from .xlsx_book import XLSXWorkBook
 
 # use this or-type instead of the "real" base class since we only have/support these two
-Book = CSVBook | XLSXBook
+Book = CSVWorkBook | XLSXWorkBook
 
 
 def book_open(src: str | Path | list[Path]) -> Book:
@@ -13,13 +13,13 @@ def book_open(src: str | Path | list[Path]) -> Book:
         src = Path(src)
 
     if isinstance(src, Path) and src.name.endswith(".xlsx"):
-        return XLSXBook(src)
+        return XLSXWorkBook(src)
     else:
-        return CSVBook(src)
+        return CSVWorkBook(src)
 
 
 __all__ = [  # noqa: PLE0604
     Book,
-    Page,
+    BasePage,
     book_open,
 ]

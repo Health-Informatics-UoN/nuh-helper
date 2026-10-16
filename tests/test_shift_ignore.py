@@ -265,6 +265,8 @@ def test_ignore_in_date_columns(
                 "idk - this can't be a date anymore",
             ],
             ["nuh65", "mssing", None, "this one has spaces"],
+            ["nuh56", "NULL", None, "oo"],
+            ["nuh57", None, None, "oo"],
         ]
         expected = [normalize_row(row) for row in expected]
         assert obtained == expected

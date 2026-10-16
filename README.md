@@ -263,6 +263,27 @@ In most cases, the process for using `shift_excel_dates_inplace()` with `.csv` o
 There is technically no requirement that all of the `.csv` files be in the same folder.
 If you're date-shifting carrot-transform output, you will want to use the list of files and remove the `person_ids.tsv` and `summary_mapstream.tsv` files.
 
+### Bypassing Data Normalization and Hidden Date Checks
+
+In one instance we've needed to disable data normalization and hidden date checks.
+If you need to do this, at the top of your pipeline ...
+
+```python
+# this didn't work until we did it at the top of the python file
+
+# import the HiddenDate exception class
+from nuh_helper.date_shift.defs import HiddenDate
+from nuh_helper.book_page.book import BaseWorkBook
+
+# disable raising this when dates are detected in places they shouldn't be
+HiddenDate.perform_checks = True
+
+# disable changing values (mostly CSV) into date or datetime objects
+# ... also stops turning "" and "  " into None
+BaseWorkBook.normalize_values = False
+
+```
+
 ## Usage - profile
 
 Profile a dataset and generate a Scan Report.

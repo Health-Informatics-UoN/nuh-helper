@@ -4,10 +4,10 @@ from _collections_abc import dict_keys
 from collections.abc import Generator as gen
 from pathlib import Path
 
-from nuh_helper.book_page.book import Book, Page, normalize_row, row_val_t
+from nuh_helper.book_page.book import BasePage, BaseWorkBook, row_val_t
 
 
-class CSVBook(Book):
+class CSVWorkBook(BaseWorkBook):
     def __init__(self, path: str | Path | list[Path]) -> None:
         self._page_files = {
             page.stem.lower(): page.absolute() for page in csv_files(path)
@@ -17,9 +17,9 @@ class CSVBook(Book):
         return self._page_files.keys()
 
     @contextlib.contextmanager
-    def __getitem__(self, name: str) -> gen[Page]:
+    def __getitem__(self, name: str) -> gen[BasePage]:
 
-        class CSVPage(Page):
+        class CSVPage(BasePage):
             def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
                 assert isinstance(self._page, Path)
                 with self._page.open() as file:
@@ -32,13 +32,11 @@ class CSVBook(Book):
                         # strip bom
                         if (
                             row == 0
+                            and line
                             and isinstance(line[0], str)
                             and line[0][:1] == "\ufeff"
                         ):
                             line[0] = line[0][1:]
-
-                        # strip cell strings, convert empty cells to None
-                        line = normalize_row(line)
 
                         yield (row, line)
 

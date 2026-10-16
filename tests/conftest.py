@@ -36,7 +36,7 @@ def output_path(request: pytest.FixtureRequest, tmp_path: Path) -> Path:
 
 
 def load_workbook(
-    path: str | Path,
+    path: str | Path | list[Path],
 ) -> dict[str, list[row_val_t]]:
     return {
         page.name: [normalize_row(cells) for _, cells in page.stream_rows()]
