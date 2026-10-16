@@ -4,6 +4,7 @@ While the book_page API is meant to be generic, this is certainly not - so it's 
 the shift module.
 """
 
+import datetime as dt
 import logging
 from collections.abc import Generator as gen
 from dataclasses import dataclass, replace
@@ -55,16 +56,17 @@ class PatientRow:
     ) -> bool:
         """determine what we should do for a given column"""
 
-        ignored: set[None | str] = shift_ignore.get(self.page_name, {}).get(
-            col_name, {None, ""}
-        )
+        ignored: set[None | str | dt.date | dt.datetime] = shift_ignore.get(
+            self.page_name, {}
+        ).get(col_name, {None, "", "NULL", "None"})
 
         return (
             ColumnType.IGNORE
             if cell_value in ignored
             else ColumnType.TEXT
             if col_name in self.text_columns
-            else ColumnType.DATE
+            # always allow NULL in date columns - even when it's not in the list
+            else (ColumnType.DATE if cell_value != "NULL" else ColumnType.IGNORE)
         )
 
 
@@ -226,7 +228,7 @@ class PatientRowStateMachine:
                 )
 
         patient_id = _parse._normalize_patient_id(patient_id)
-        if patient_id is None:
+        if patient_id is None or patient_id == "NULL":
             # if the pid is None; the rest of the row should be None as well
             if non_blank := [
                 cell

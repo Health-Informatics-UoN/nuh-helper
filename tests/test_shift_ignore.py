@@ -264,6 +264,8 @@ def test_ignore_in_date_columns(
                 "idk - this can't be a date anymore",
             ],
             ["nuh65", "mssing", None, "this one has spaces"],
+            ["nuh56", "NULL", None, "oo"],
+            ["nuh57", None, None, "oo"],
         ]
         expected = [normalize_row(row) for row in expected]
         assert obtained == expected
@@ -448,7 +450,6 @@ def src_and_out_names(
 
 
 def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
-
     return {
         page.name: [normalize_row(cells) for _, cells in page.stream_rows()]
         for page in book_page.book_open(path)
