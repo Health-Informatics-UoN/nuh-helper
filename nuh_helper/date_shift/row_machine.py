@@ -56,18 +56,41 @@ class PatientRow:
     ) -> bool:
         """determine what we should do for a given column"""
 
+        # values we ignore in this column
         ignored: set[None | str | dt.date | dt.datetime] = shift_ignore.get(
             self.page_name, {}
         ).get(col_name, {None, "", "NULL", "None"})
 
-        return (
-            ColumnType.IGNORE
-            if cell_value in ignored
-            else ColumnType.TEXT
-            if col_name in self.text_columns
-            # always allow NULL in date columns - even when it's not in the list
-            else (ColumnType.DATE if cell_value != "NULL" else ColumnType.IGNORE)
+        # we need these as well
+        ignored = (
+            list(ignored)
+            + [
+                # add date -> datetime(00:00)
+                dt.datetime(each.year, each.month, each.day)
+                for each in ignored
+                if isinstance(each, dt.date)
+            ]
+            + [
+                # add datetime(00:00) -> date
+                dt.date(each.year, each.month, each.day)
+                for each in ignored
+                if isinstance(each, dt.datetime)
+                and each.hour == 0
+                and each.minute == 0
+                and each.second == 0
+            ]
         )
+
+        if cell_value in ignored:
+            return ColumnType.IGNORE
+
+        if col_name in self.text_columns:
+            return ColumnType.TEXT
+
+        if cell_value == "NULL":
+            return ColumnType.IGNORE
+
+        return ColumnType.DATE
 
 
 class PatientRowStateMachine:

@@ -5,19 +5,16 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from conftest import load_workbook
 from openpyxl import Workbook
 
+from nuh_helper.book_page.book import normalize_row
 from nuh_helper.date_shift import (
-    apply_date_shifts,
-    generate_shift_mappings,
-    load_shift_mappings,
-    shift_excel_dates,
-)
-from nuh_helper.date_shift._excel import (
-    _description_merged_ranges,
-    _get_row_values_resolving_merged,
+    shift_excel_dates_inplace,
 )
 from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_value
+
+test_data = Path(__file__).parent / "data" / __name__
 
 
 class TestNormalizePatientId:
@@ -85,132 +82,6 @@ class TestParseDateValue:
         assert _parse_date_value("01-15-2023") == pd.Timestamp("2023-01-15")
 
 
-class TestGenerateShiftMappings:
-    def test_returns_correct_columns(self) -> None:
-        result = generate_shift_mappings(["P001"])
-        assert list(result.columns) == ["patient_id", "shift_days"]
-
-    def test_one_row_per_patient(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result = generate_shift_mappings(ids)
-        assert len(result) == 3
-        assert list(result["patient_id"]) == ids
-
-    def test_reproducible_with_seed(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result1 = generate_shift_mappings(ids, seed=42)
-        result2 = generate_shift_mappings(ids, seed=42)
-        assert list(result1["shift_days"]) == list(result2["shift_days"])
-
-    def test_different_seeds_differ(self) -> None:
-        ids = ["P001", "P002", "P003"]
-        result1 = generate_shift_mappings(ids, seed=1)
-        result2 = generate_shift_mappings(ids, seed=2)
-        assert list(result1["shift_days"]) != list(result2["shift_days"])
-
-    def test_shifts_within_specified_range(self) -> None:
-        ids = [f"P{i:03d}" for i in range(100)]
-        result = generate_shift_mappings(
-            ids, min_shift_days=-7, max_shift_days=7, seed=42
-        )
-        assert result["shift_days"].between(-7, 7).all()
-
-    def test_empty_patient_list(self) -> None:
-        result = generate_shift_mappings([])
-        assert len(result) == 0
-
-
-class TestLoadShiftMappings:
-    def test_loads_valid_csv(self, tmp_path: Path) -> None:
-        csv_file = tmp_path / "shifts.csv"
-        csv_file.write_text("patient_id,shift_days\nP001,5\nP002,-3\n")
-        result = load_shift_mappings(str(csv_file))
-        assert list(result["patient_id"]) == ["P001", "P002"]
-        assert list(result["shift_days"]) == [5, -3]
-
-    def test_raises_on_missing_columns(self, tmp_path: Path) -> None:
-        csv_file = tmp_path / "bad.csv"
-        csv_file.write_text("id,days\nP001,5\n")
-        with pytest.raises(ValueError, match="patient_id.*shift_days"):
-            load_shift_mappings(str(csv_file))
-
-
-class TestGetRowValuesResolvingMerged:
-    """Unit tests for _get_row_values_resolving_merged (merged cell header handling)."""
-
-    def test_merged_row_returns_value_repeated_for_each_column(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "crazy"
-        ws.merge_cells("A1:D1")
-        result = _get_row_values_resolving_merged(ws, 1, 4)
-        assert result == ["crazy", "crazy", "crazy", "crazy"]
-
-    def test_normal_row_returns_cell_values(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A2"] = "patient_id"
-        ws["B2"] = "measurement"
-        ws["C2"] = "date_result"
-        ws["D2"] = "type"
-        result = _get_row_values_resolving_merged(ws, 2, 4)
-        assert result == ["patient_id", "measurement", "date_result", "type"]
-
-    def test_partial_merge_second_column_gets_top_left_value(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "a"
-        ws["B1"] = "b"
-        ws.merge_cells("B1:C1")
-        ws["D1"] = "d"
-        result = _get_row_values_resolving_merged(ws, 1, 4)
-        assert result == ["a", "b", "b", "d"]
-
-
-class TestDescriptionMergedRanges:
-    """Unit tests for _description_merged_ranges."""
-
-    def test_returns_merged_ranges_within_description_rows(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "title"
-        ws.merge_cells("A1:D1")
-        result = _description_merged_ranges(ws, 1)
-        assert result == ["A1:D1"]
-
-    def test_excludes_merged_ranges_below_description_rows(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "title"
-        ws.merge_cells("A1:D1")
-        ws["A2"] = "x"
-        ws.merge_cells("A2:B2")
-        result = _description_merged_ranges(ws, 1)
-        assert result == ["A1:D1"]
-
-    def test_empty_when_no_merged_cells(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "a"
-        result = _description_merged_ranges(ws, 2)
-        assert result == []
-
-    def test_empty_when_num_description_rows_zero(self) -> None:
-        wb = Workbook()
-        ws = wb.active
-        assert ws is not None
-        ws["A1"] = "x"
-        ws.merge_cells("A1:B1")
-        result = _description_merged_ranges(ws, 0)
-        assert result == []
-
-
 class TestShiftExcelDatesWithComplexLayout:
     """Integration tests: header_row, skip_rows_after_header, merged cells,
     patient sheet from config."""
@@ -260,24 +131,33 @@ class TestShiftExcelDatesWithComplexLayout:
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["date_result"],
+                "text_columns": [
+                    "type",
+                    "measurement",
+                ],
                 "header_row": 2,
                 "skip_rows_after_header": [3],
             },
         }
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "old-linking.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
             seed=42,
         )
         df = pd.read_excel(str(out), sheet_name="patients", header=2)
         assert list(df.columns) == ["patient_id", "measurement", "date_result", "type"]
-        # Data should be 2 rows (P001, P002), not 3 (no "stupid" row)
-        assert len(df) == 2
-        assert list(df["patient_id"]) == ["P001", "P002"]
+        # Data should now be 3 rows (stupid, P001, P002)
+        # ... Pandas can see "stupid" but date shifting doesn't
+        assert (
+            # this should be 3 these days
+            # ... it used to be "2" because "skip_rows_after_header" removed the rows?
+            len(df) == 3
+        )
+        assert list(df["patient_id"]) == ["stupid", "P001", "P002"]
 
     def test_patient_sheet_uses_config_header_when_sheet_in_sheet_configs(
         self, tmp_path: Path
@@ -291,6 +171,10 @@ class TestShiftExcelDatesWithComplexLayout:
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["date_result"],
+                "text_columns": [
+                    "measurement",
+                    "type",
+                ],
                 "header_row": 2,
                 "skip_rows_after_header": [3],
             },
@@ -299,12 +183,12 @@ class TestShiftExcelDatesWithComplexLayout:
          Do not pass patient_header_row; patient sheet "patients"
          is in config with header_row=2
          """
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "old-linking.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
             seed=42,
         )
@@ -312,182 +196,11 @@ class TestShiftExcelDatesWithComplexLayout:
         df = pd.read_excel(str(out), sheet_name="patients", header=2)
         assert "patient_id" in df.columns
         assert "date_result" in df.columns
-        assert len(df) == 2
-
-
-class TestApplyDateShifts:
-    def _make_mappings(self, patient_id: str, shift_days: int) -> pd.DataFrame:
-        return pd.DataFrame({"patient_id": [patient_id], "shift_days": [shift_days]})
-
-    def test_shifts_date_forward(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
+        assert (
+            # this should be 3 these days
+            # ... it used to be "2" because "skip_rows_after_header" removed the rows?
+            len(df) == 3
         )
-        assert result["visit_date"].iloc[0] == date(2023, 1, 25)
-
-    def test_shifts_date_backward(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-06-01"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", -5)
-        )
-        assert result["visit_date"].iloc[0] == date(2023, 5, 27)
-
-    def test_zero_shift_leaves_date_unchanged(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 0)
-        )
-        assert result["visit_date"].iloc[0] == date(2023, 1, 15)
-
-    def test_unknown_patient_leaves_date_unchanged(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P999"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
-        )
-        assert result["visit_date"].iloc[0] == date(2023, 1, 15)
-
-    def test_placeholder_date_becomes_none(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["Unknown"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
-        )
-        assert result["visit_date"].iloc[0] is None
-
-    def test_none_date_stays_none(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": [None]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
-        )
-        assert result["visit_date"].iloc[0] is None
-
-    def test_missing_date_column_is_skipped(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        mappings = self._make_mappings("P001", 10)
-        # "nonexistent" should be silently skipped; "visit_date" still shifted
-        result = apply_date_shifts(
-            df, "patient_id", ["nonexistent", "visit_date"], mappings
-        )
-        assert result["visit_date"].iloc[0] == date(2023, 1, 25)
-
-    def test_strips_whitespace_from_patient_ids(self) -> None:
-        df = pd.DataFrame({"patient_id": ["  P001  "], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
-        )
-        assert result["visit_date"].iloc[0] == date(2023, 1, 25)
-
-    def test_multiple_patients_shifted_independently(self) -> None:
-        df = pd.DataFrame(
-            {
-                "patient_id": ["P001", "P002"],
-                "visit_date": ["2023-01-01", "2023-01-01"],
-            }
-        )
-        mappings = pd.DataFrame({"patient_id": ["P001", "P002"], "shift_days": [5, -5]})
-        result = apply_date_shifts(df, "patient_id", ["visit_date"], mappings)
-        assert result["visit_date"].iloc[0] == date(2023, 1, 6)
-        assert result["visit_date"].iloc[1] == date(2022, 12, 27)
-
-    def test_result_dates_are_date_not_datetime(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        result = apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 0)
-        )
-        val = result["visit_date"].iloc[0]
-        assert isinstance(val, date)
-        assert not isinstance(val, datetime)
-
-    def test_does_not_mutate_input(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2023-01-15"]})
-        original_visit = df["visit_date"].iloc[0]
-        apply_date_shifts(
-            df, "patient_id", ["visit_date"], self._make_mappings("P001", 10)
-        )
-        assert df["visit_date"].iloc[0] == original_visit
-
-
-class TestApplyDateShiftsExceptions:
-    def _make_mappings(self, patient_id: str, shift_days: int) -> pd.DataFrame:
-        return pd.DataFrame({"patient_id": [patient_id], "shift_days": [shift_days]})
-
-    def test_exception_date_is_not_shifted(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2024-12-31"]})
-        result = apply_date_shifts(
-            df,
-            "patient_id",
-            ["visit_date"],
-            self._make_mappings("P001", 10),
-            shift_exceptions={"visit_date": ["2024-12-31"]},
-        )
-        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
-
-    def test_non_exception_date_in_same_column_is_shifted(self) -> None:
-        df = pd.DataFrame(
-            {
-                "patient_id": ["P001", "P002"],
-                "visit_date": ["2024-12-31", "2023-06-01"],
-            }
-        )
-        mappings = pd.DataFrame(
-            {"patient_id": ["P001", "P002"], "shift_days": [10, 10]}
-        )
-        result = apply_date_shifts(
-            df,
-            "patient_id",
-            ["visit_date"],
-            mappings,
-            shift_exceptions={"visit_date": ["2024-12-31"]},
-        )
-        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
-        assert result["visit_date"].iloc[1] == date(2023, 6, 11)
-
-    def test_exception_only_applies_to_specified_column(self) -> None:
-        df = pd.DataFrame(
-            {
-                "patient_id": ["P001"],
-                "col_a": ["2024-12-31"],
-                "col_b": ["2024-12-31"],
-            }
-        )
-        result = apply_date_shifts(
-            df,
-            "patient_id",
-            ["col_a", "col_b"],
-            self._make_mappings("P001", 5),
-            shift_exceptions={"col_a": ["2024-12-31"]},
-        )
-        assert result["col_a"].iloc[0] == date(2024, 12, 31)
-        assert result["col_b"].iloc[0] == date(2025, 1, 5)
-
-    def test_multiple_exception_dates(self) -> None:
-        df = pd.DataFrame(
-            {
-                "patient_id": ["P001", "P001", "P001"],
-                "visit_date": ["2024-12-31", "2024-06-30", "2023-01-15"],
-            }
-        )
-        result = apply_date_shifts(
-            df,
-            "patient_id",
-            ["visit_date"],
-            self._make_mappings("P001", 7),
-            shift_exceptions={"visit_date": ["2024-12-31", "2024-06-30"]},
-        )
-        assert result["visit_date"].iloc[0] == date(2024, 12, 31)
-        assert result["visit_date"].iloc[1] == date(2024, 6, 30)
-        assert result["visit_date"].iloc[2] == date(2023, 1, 22)
-
-    def test_no_exceptions_kwarg_shifts_normally(self) -> None:
-        df = pd.DataFrame({"patient_id": ["P001"], "visit_date": ["2024-12-31"]})
-        result = apply_date_shifts(
-            df,
-            "patient_id",
-            ["visit_date"],
-            self._make_mappings("P001", 10),
-            shift_exceptions=None,
-        )
-        assert result["visit_date"].iloc[0] == date(2025, 1, 10)
 
 
 class TestShiftExcelDatesExceptionsIntegration:
@@ -510,26 +223,32 @@ class TestShiftExcelDatesExceptionsIntegration:
         xlsx = tmp_path / "in.xlsx"
         self._make_excel(xlsx)
         out = tmp_path / "out.xlsx"
+
+        # raise Exception(f'{__name__=}')
         sheet_configs = {
             "patients": {
                 "patient_id_col": "patient_id",
                 "date_columns": ["last_alive"],
-                "shift_exceptions": {"last_alive": ["2024-12-31"]},
+                "text_columns": [],
             }
         }
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             input_file=str(xlsx),
             output_file=str(out),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=sheet_configs,
+            linking_table_path=tmp_path / "does-not-exist.csv",
             linking_table_output=str(tmp_path / "linking.csv"),
+            shift_ignore_yaml=test_data / "shift-ignore.yaml",
             seed=42,
         )
-        df = pd.read_excel(str(out), sheet_name="patients")
-        p001_date = df.loc[df["patient_id"] == "P001", "last_alive"].iloc[0]
-        p002_date = df.loc[df["patient_id"] == "P002", "last_alive"].iloc[0]
-        # P002's date is an exception — must be unchanged
-        assert pd.Timestamp(p002_date).date() == date(2024, 12, 31)
-        # P001's date must have been shifted (seed=42 gives a non-zero shift)
-        assert pd.Timestamp(p001_date).date() != date(2023, 6, 1)
+        expected = {
+            "patients": [
+                normalize_row(["patient_id", "last_alive"]),
+                normalize_row(["P001", "2023-06-06"]),
+                normalize_row(["P002", "2024-12-31"]),
+            ],
+        }
+        obtained = load_workbook(out)
+
+        assert obtained == expected

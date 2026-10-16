@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import pytest
+from conftest import load_workbook
 
-from nuh_helper import book_page, shift_excel_dates_inplace
+from nuh_helper import shift_excel_dates_inplace
 from nuh_helper.book_page import normalize_row
 from nuh_helper.date_shift.defs import (
     HiddenDate,
@@ -447,10 +448,3 @@ def src_and_out_names(
         source_file = test_data / "workbook.xlsx"
         output_path = tmp_path / "target.xlsx"
     return source_file, output_path
-
-
-def load_workbook(path: str | Path) -> dict[str, list[list[str | None]]]:
-    return {
-        page.name: [normalize_row(cells) for _, cells in page.stream_rows()]
-        for page in book_page.book_open(path)
-    }
