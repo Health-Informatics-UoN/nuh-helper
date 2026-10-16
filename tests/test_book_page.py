@@ -9,6 +9,8 @@ from nuh_helper.book_page import (
     CSVWorkBook,
     XLSXWorkBook,
     book_open,
+    load_workbook,
+    normalize_row,
 )
 
 test_data = (
@@ -280,4 +282,35 @@ def test_bom_is_removed() -> None:
         ["cake", "nuh27", "cheese"],
         ["clip", "nuh65", "jkl"],
     ]
+    assert obtained == expected
+
+
+def test_full_datetime(tmp_path: Path) -> None:
+    source = tmp_path / "source/data.csv"
+    output = tmp_path / "output/data.csv"
+
+    source.parent.mkdir()
+    output.parent.mkdir()
+
+    source.write_text(
+        textwrap.dedent(
+            """
+        name, time
+        foo, 2012-09-18 00:01:02
+        bar, 2012-09-11
+        """
+        )
+    )
+
+    for _ in book_open([source]).stream_copy(output):
+        pass
+
+    obtained = load_workbook(output)
+    expected = {
+        "data": [
+            ["name", "time"],
+            normalize_row(["foo", "2012-09-18 00:01:02"]),
+            normalize_row(["bar", "2012-09-11"]),
+        ]
+    }
     assert obtained == expected
