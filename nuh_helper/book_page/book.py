@@ -17,7 +17,7 @@ class BasePage(ABC):
     @abstractmethod
     def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        pass
+        ...
 
     def stream_rows(self) -> gen[tuple[int, row_val_t]]:
         """public method for reading a RO stream of rows from a specific page"""
@@ -41,17 +41,15 @@ class BaseWorkBook(ABC):
         return name in self.keys()
 
     @abstractmethod
-    def __getitem__(self, name: str) -> gen[BasePage]:
-        pass
+    def __getitem__(self, name: str) -> gen[BasePage]: ...
 
     @abstractmethod
-    def keys(self) -> iterable[str]:
-        pass
+    def keys(self) -> iterable[str]: ...
 
     @abstractmethod
     def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        pass
+        ...
 
     def stream_copy(
         self,
