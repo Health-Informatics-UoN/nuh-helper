@@ -23,8 +23,9 @@ class Page(ABC):
         """public method for reading a RO stream of rows from a specific page"""
 
         for row_idx, row_data in self._stream_rows_impl():
-            for raw_idx, raw_val in enumerate(row_data):
-                row_data[raw_idx] = normalize_val(raw_val)
+            if Book.normalize:
+                for raw_idx, raw_val in enumerate(row_data):
+                    row_data[raw_idx] = normalize_val(raw_val)
 
             yield row_idx, row_data
 
@@ -34,6 +35,8 @@ class Page(ABC):
 
 
 class Book(ABC):
+    normalize: bool = True
+
     def __contains__(self, name: str) -> bool:
         return name in self.keys()
 
@@ -67,11 +70,12 @@ class Book(ABC):
 
         for page_name, row_idx, row_data in self._stream_copy_impl(into):
             yield page_name, row_idx, row_data
-            for raw_idx, raw_val in enumerate(row_data):
-                if isinstance(raw_val, date):
-                    row_data[raw_idx] = raw_val.strftime(date_format)
-                elif isinstance(raw_val, datetime):
-                    row_data[raw_idx] = raw_val.strftime(time_format)
+            if Book.normalize:
+                for raw_idx, raw_val in enumerate(row_data):
+                    if isinstance(raw_val, date):
+                        row_data[raw_idx] = raw_val.strftime(date_format)
+                    elif isinstance(raw_val, datetime):
+                        row_data[raw_idx] = raw_val.strftime(time_format)
 
     def __iter__(self) -> gen[Page]:
         for name in self.keys():
