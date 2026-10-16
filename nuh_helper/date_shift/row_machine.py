@@ -253,9 +253,9 @@ class PatientRowStateMachine:
             row_cells=row_cells,
         )
 
-    def book_copy(scanner, book: BaseWorkBook, output_file: Path) -> gen[PatientRow]:
+    def book_copy(self, book: BaseWorkBook, output_file: Path) -> gen[PatientRow]:
         for sheet_name, row_idx, row_cells in book.stream_copy(output_file):
             # check if we're in a patient row, and, yield the row details if so
-            detail = scanner.next_details(sheet_name, row_idx, row_cells)
+            detail = self.next_details(sheet_name, row_idx, row_cells)
             if detail:
                 yield detail
