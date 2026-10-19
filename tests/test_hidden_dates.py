@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import (
+from nuh_helper.date_shift.defs import (
     HiddenDate,
 )
 
@@ -34,7 +34,6 @@ def test_iso8601(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="args",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -44,13 +43,14 @@ def test_iso8601(tmp_path: Path) -> None:
         )
 
     assert info.value._message == (
-        "hidden date in [sheet_name='args', 4, 3]"
+        "hidden date in [sheet_name='args', 3, 2 @ diagnosis]"
         + " value='hives on 2023-10-12'"
         + " // found=datetime.datetime(2023, 10, 12, 0, 0)"
     )
 
 
-def test_us_date(tmp_path: Path) -> None:
+@pytest.mark.parametrize("bypass", [True, False])
+def test_us_date(bypass: bool, tmp_path: Path) -> None:
 
     source_file = Path(__file__).parent / "data/hidden_dates/us_date.xlsx"
     output_path = tmp_path / "target.xlsx"
@@ -70,12 +70,12 @@ def test_us_date(tmp_path: Path) -> None:
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(HiddenDate) as info:
+
+    def shift() -> None:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="data",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -84,11 +84,24 @@ def test_us_date(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == (
-        "hidden date in [sheet_name='data', 6, 3]"
-        + ' value="can\'t recall the date but on 12/11/2001 they had an itchy tummy"'
-        + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
-    )
+    assert HiddenDate.perform_checks
+
+    if bypass:
+        try:
+            HiddenDate.perform_checks = False
+            shift()
+        finally:
+            HiddenDate.perform_checks = True
+    else:
+        with pytest.raises(HiddenDate) as info:
+            shift()
+
+        assert info.value._message == (
+            "hidden date in [sheet_name='data', 5, 2 @ diagnosis]"
+            + " value=\"can't recall the date but "
+            + 'on 12/11/2001 they had an itchy tummy"'
+            + " // found=datetime.datetime(2001, 12, 11, 0, 0)"
+        )
 
 
 def test_written(tmp_path: Path) -> None:
@@ -116,7 +129,6 @@ def test_written(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="yeah",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -126,7 +138,7 @@ def test_written(tmp_path: Path) -> None:
         )
 
     assert info.value._message == (
-        "hidden date in [sheet_name='yeah', 5, 3]"
+        "hidden date in [sheet_name='yeah', 4, 2 @ diagnosis]"
         + " value='flu on mar 21st, 2009'"
         + " // found=datetime.datetime(2009, 3, 21, 0, 0)"
     )
@@ -157,7 +169,6 @@ def test_hidden_in_patient_id(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="data",
-            patient_id_col="ptid",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -167,7 +178,7 @@ def test_hidden_in_patient_id(tmp_path: Path) -> None:
         )
 
     assert info.value._sheet_name == "data"
-    assert info.value._row == 5
-    assert info.value._col == 1
+    assert info.value._row == 4
+    assert info.value._col == 0
     assert info.value._value == "nuh012 12/11/2001"
     assert info.value._found == datetime(2001, 12, 11)

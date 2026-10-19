@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 from pathlib import Path
 
 import pytest
@@ -10,9 +10,9 @@ from nuh_helper import shift_excel_dates_inplace
 @pytest.mark.parametrize("clamp", [True, False])
 def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
 
-    clamp_date: None | datetime.datetime = None
+    clamp_date: None | dt.date = None
     if clamp:
-        clamp_date = datetime.datetime(2024, 9, 18)
+        clamp_date = dt.date(2024, 9, 18)
 
     source_file = Path(__file__).parent / "data/clamped/Book5.xlsx"
     output_path = tmp_path / "target.xlsx"
@@ -40,7 +40,6 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
         input_file=str(source_file),
         output_file=str(output_path),
         patient_sheet="people",
-        patient_id_col="ptid",
         sheet_configs=sheet_configs,
         min_shift_days=-20,
         max_shift_days=-1,
@@ -63,9 +62,9 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
 
     assert people.cell(1, 2).value == "date of birth"
     assert people.cell(2, 2).value == "dob"
-    assert str(people.cell(3, 2).value) == "1990-08-18 00:00:00"
-    assert str(people.cell(4, 2).value) == "1987-09-10 00:00:00"
-    assert str(people.cell(5, 2).value) == "1976-02-19 00:00:00"
+    assert str(people.cell(3, 2).value) == "1990-08-18"
+    assert str(people.cell(4, 2).value) == "1987-09-10"
+    assert str(people.cell(5, 2).value) == "1976-02-19"
 
     assert people.cell(1, 3).value is None
     assert people.cell(2, 3).value == "something else"
@@ -101,16 +100,16 @@ def test_clamp_dates(clamp: bool, tmp_path: Path) -> None:
     # column 3 will have the clamped dates
     assert events.cell(1, 3).value == "date"
     assert str(events.cell(2, 3).value) == (
-        "2025-06-06 00:00:00" if not clamp else str(clamp_date)
+        "2025-06-06" if not clamp else str(clamp_date)
     )
     assert events.cell(3, 3).value is None
     assert str(events.cell(4, 3).value) == (
-        "2025-08-31 00:00:00" if not clamp else str(clamp_date)
+        "2025-08-31" if not clamp else str(clamp_date)
     )
     assert str(events.cell(5, 3).value) == (
-        "2026-07-12 00:00:00" if not clamp else str(clamp_date)
+        "2026-07-12" if not clamp else str(clamp_date)
     )
     assert events.cell(6, 3).value is None
     assert str(events.cell(7, 3).value) == (
-        "2025-09-16 00:00:00" if not clamp else str(clamp_date)
+        "2025-09-16" if not clamp else str(clamp_date)
     )
