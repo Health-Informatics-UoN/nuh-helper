@@ -1,0 +1,4 @@
+id	name	age	score	city	active
+1	Alice	28	87.5	London	True
+2	Bob	34	92.1	Paris	False
+3	Carol	22	78.3	Tokyo	True

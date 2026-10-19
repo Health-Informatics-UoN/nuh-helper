@@ -13,7 +13,7 @@ from typing import TypedDict, Unpack
 
 import pandas as pd
 
-from nuh_helper import shift_excel_dates
+from nuh_helper import shift_excel_dates_inplace
 
 
 class _ShiftKwargs(TypedDict, total=False):
@@ -27,15 +27,25 @@ class _ShiftKwargs(TypedDict, total=False):
 DATA_DIR = Path(__file__).parent / "data"
 INPUT_FILE = DATA_DIR / "patients.xlsx"
 
+test_data = Path(__file__).parent / "data" / __name__
+
 # Config matching the structure of patients.xlsx
 SHEET_CONFIGS = {
     "patients": {
         "patient_id_col": "patient_id",
         "date_columns": ["dob", "last_alive"],
+        "text_columns": ["name"],
     },
     "results": {
         "patient_id_col": "patient_id",
         "date_columns": ["date_result"],
+        "text_columns": [
+            "measurement",
+            "type",
+        ],
+        "pass_as_is": {
+            "date_result": ["unknown"],
+        },
     },
 }
 
@@ -48,13 +58,14 @@ def run_shift(base: Path, **kwargs: Unpack[_ShiftKwargs]) -> tuple[Path, Path]:
     """
     output = base / "output.xlsx"
     linking = base / "linking.csv"
-    shift_excel_dates(
+    shift_excel_dates_inplace(
         str(INPUT_FILE),
         str(output),
         patient_sheet="patients",
-        patient_id_col="patient_id",
         sheet_configs=SHEET_CONFIGS,
+        linking_table_path=linking.parent / "old-linking.csv",
         linking_table_output=str(linking),
+        shift_ignore_yaml=test_data / ("shift-ignore.yaml"),
         **kwargs,
     )
     return output, linking
@@ -167,7 +178,7 @@ class TestDateShifting:
         test5_date = output_results.loc[
             output_results["patient_id"] == "Test5", "date_result"
         ].iloc[0]
-        assert pd.isna(test5_date)
+        assert test5_date == "unknown"
 
 
 class TestReproducibility:
@@ -192,14 +203,14 @@ class TestReproducibility:
         output1, linking = run_shift(output_path, seed=42)
 
         output2 = output_path / "output2.xlsx"
-        shift_excel_dates(
+        shift_excel_dates_inplace(
             str(INPUT_FILE),
             str(output2),
             patient_sheet="patients",
-            patient_id_col="patient_id",
             sheet_configs=SHEET_CONFIGS,
             linking_table_path=str(linking),
             linking_table_output=str(output_path / "linking2.csv"),
+            shift_ignore_yaml=test_data / ("shift-ignore.yaml"),
         )
 
         for sheet in SHEET_CONFIGS:
