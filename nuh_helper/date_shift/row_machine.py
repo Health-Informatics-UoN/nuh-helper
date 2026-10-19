@@ -61,7 +61,7 @@ class PatientRow:
             self.page_name, {}
         ).get(col_name, {None, "", "NULL", "None"})
 
-        # we need these as well
+        # expand to include the dates when datetime=00:00:00 and datetime for dates
         ignored = (
             list(ignored)
             + [
