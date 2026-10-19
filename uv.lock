@@ -197,6 +197,7 @@ dependencies = [
     { name = "datefinder" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -216,6 +217,7 @@ requires-dist = [
     { name = "datefinder", specifier = ">=1.0.0" },
     { name = "openpyxl", specifier = ">=3.1.0" },
     { name = "pandas", specifier = ">=3.0.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [package.metadata.requires-dev]
