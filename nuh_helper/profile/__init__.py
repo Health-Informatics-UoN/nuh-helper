@@ -160,6 +160,7 @@ def generate_scan_report(
     csv_files: list[str],
     output_path: str = SCAN_REPORT_FILE_NAME,
     min_cell_count: int = 1,
+    remove_bom: bool = True,
 ) -> str:
     logger.info("Generating scan report for %d table(s)", len(csv_files))
 
@@ -265,6 +266,21 @@ def generate_scan_report(
     meta_sheet.append(["sourceType", "CSV_FILES"])
     meta_sheet.append(["scanValues", True])
     meta_sheet.append(["minCellCount", min_cell_count])
+
+    # remove BOM from cell starts
+    # ... do it to all cells ...
+    if remove_bom:
+        for name in wb.sheetnames:
+            page = wb[name]
+
+            for row in range(page.max_row):
+                row += 1
+                for col in range(page.max_column):
+                    col += 1
+
+                    value = page.cell(row, col).value
+                    if isinstance(value, str) and value != "" and value[0] == "\ufeff":
+                        page.cell(row, col).value = value[1:]
 
     wb.save(output_path)
     logger.info("Scan report written to '%s'", output_path)
