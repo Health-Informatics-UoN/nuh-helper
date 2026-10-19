@@ -226,6 +226,7 @@ While this does require repeated manual intervention ...
   - `header_row`: (Optional) Zero-based row index for the row that contains column names (default to 0 with `shift_excel_dates_inplace()`)
   - `skip_rows_after_header`: (Optional) List of zero-based row indices to exclude from data (e.g. a data-type row immediately below the header) (default to [] with `shift_excel_dates_inplace()`)
   - `shift_exceptions`: (Optional) Dict mapping column names to lists of date strings that should never be shifted (e.g. a fixed end-of-study date). Dates are parsed using the same flexible parser as regular date values. (not allowed with `shift_excel_dates_inplace()`)
+- `sanity_date_latest`, `sanity_date_earliest`: (Optional) The latest and earliest dates allowed in the data. These are used as a sanity check to detect obvious typos like `1208-09-13` and will default to the current day and `1900-01-01` respectively.
 
 ### Excel layout (header row and merged cells)
 

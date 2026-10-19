@@ -4,12 +4,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import datefinder
-from pandas import Timedelta
+import pandas as pd
 
 from nuh_helper.book_page import BaseWorkBook, book_open
 from nuh_helper.date_shift import _parse, mappings
 from nuh_helper.date_shift.defs import (
     BlankColumnHasData,
+    DateTooFarAhead,
+    DateTooFarBack,
     FoundExtraPages,
     FoundMissingPages,
     HiddenDate,
@@ -38,6 +40,8 @@ def shift_excel_dates_inplace(
     linking_table_output: str | None = None,
     seed: int | None = None,
     shift_ignore_yaml: None | str | Path = None,
+    sanity_date_latest: datetime | str | pd.Timestamp | None = None,
+    sanity_date_earliest: datetime | str | pd.Timestamp | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -72,14 +76,25 @@ def shift_excel_dates_inplace(
             path to a .yaml file holding `page:{column:[values]}` lists of cell
             values that're ignored and passed as-is with no manipulation. None
             and "" are always added, and all values will be .strip()
-
-        (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
+            (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
+        sanity_date_latest, sanity_date_earliest: latest and earliest dates allowed in the data. used as a sanity check
     """  # noqa: E501
 
     logger.info(
         f"Shifting dates in-place: '{input_file=}' -> '{output_file=}'"
         + f"{min_shift_days=} {max_shift_days=} {seed=}"
     )
+
+    if sanity_date_latest is None:
+        sanity_date_latest = datetime.now()
+    if not isinstance(sanity_date_latest, pd.Timestamp):
+        sanity_date_latest = pd.Timestamp(sanity_date_latest)
+
+    if sanity_date_earliest is None:
+        sanity_date_earliest = "1900-01-01"
+
+    if not isinstance(sanity_date_earliest, pd.Timestamp):
+        sanity_date_earliest = pd.Timestamp(sanity_date_earliest)
 
     book: BaseWorkBook = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
@@ -119,7 +134,7 @@ def shift_excel_dates_inplace(
     #   - ... which is why this acts a bit weird
     for detail in PatientRowStateMachine(sheet_configs).book_copy(book, output_file):
         # determine how many days to shift
-        shift_delta: Timedelta = shift_deltas.get(detail.patient_id)
+        shift_delta: pd.Timedelta = shift_deltas.get(detail.patient_id)
         if shift_delta is None:
             # all patients need to have a shift value
             raise UnknownPatient(detail.page_name, detail.patient_id)
@@ -132,6 +147,8 @@ def shift_excel_dates_inplace(
                 detail=detail,
                 shift_delta=shift_delta,
                 shift_ignore=shift_ignore,
+                sanity_date_earliest=sanity_date_earliest,
+                sanity_date_latest=sanity_date_latest,
             )
 
             if str(shifted_cell) != str(cell_value):
@@ -144,8 +161,10 @@ def _shift_cell(
     cell_value: str | object | None,
     col_idx: int,
     detail: PatientRow,
-    shift_delta: Timedelta,
+    shift_delta: pd.Timedelta,
     shift_ignore: shift_ignore_t,
+    sanity_date_earliest: pd.Timestamp,
+    sanity_date_latest: pd.Timestamp,
 ) -> str:
     # skip the patient id column (it was already checked anyway)
     if col_idx == detail.patient_id_idx:
@@ -189,12 +208,19 @@ def _shift_cell(
         case ColumnType.DATE:
             # cell_value can be str | datetime | date
             # ... so parsed might not always succeed
-            parsed = _parse._parse_date_value(cell_value)
+            parsed: None | pd.Timestamp = _parse._parse_date_value(cell_value)
             if parsed is None:
                 # raise an error; we already handled ignored values
                 raise ShiftFoundNonDate(
                     detail.page_name, detail.row_idx, col_idx, col_name, cell_value
                 )
+
+            # only check the dates we're shifting
+            # ... other branches handle non-dates and dates we're not shifting
+            if parsed <= sanity_date_earliest:
+                raise DateTooFarBack(parsed)
+            if parsed >= sanity_date_latest:
+                raise DateTooFarAhead(parsed)
 
             # perform the actual shifting
             shifted = parsed + shift_delta

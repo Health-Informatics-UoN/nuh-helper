@@ -3,10 +3,10 @@ from pathlib import Path
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
-from nuh_helper.date_shift import (
+from nuh_helper.book_page.book import normalize_val
+from nuh_helper.date_shift.defs import (
     DateTooFarAhead,
     DateTooFarBack,
-    ShiftFoundNonDate,
 )
 
 
@@ -34,7 +34,6 @@ def test_too_far_ahead(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="tofarr",
-            patient_id_col="patient",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -69,12 +68,11 @@ def test_1000_date(tmp_path: Path) -> None:
             "skip_rows_after_header": [],
         },
     }
-    with pytest.raises(ShiftFoundNonDate) as info:
+    with pytest.raises(DateTooFarBack) as info:
         shift_excel_dates_inplace(
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="Sheet1",
-            patient_id_col="patient",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
@@ -83,7 +81,7 @@ def test_1000_date(tmp_path: Path) -> None:
             linking_table_output=str(linking_table_out),
         )
 
-    assert info.value._message == "page='Sheet1'[4, 2 @ col_name='dob'] val='5/2/1007'"
+    assert info.value._date == normalize_val("1007-02-05 00:00:00")
 
 
 def test_too_far_back(tmp_path: Path) -> None:
@@ -112,7 +110,6 @@ def test_too_far_back(tmp_path: Path) -> None:
             input_file=str(source_file),
             output_file=str(output_path),
             patient_sheet="Sheet1",
-            patient_id_col="patient",
             sheet_configs=sheet_configs,
             min_shift_days=-20,
             max_shift_days=-1,
