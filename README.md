@@ -21,13 +21,10 @@ Helper library for enabling data studies: utilities for study enablement such as
 ```python
 from nuh_helper import shift_excel_dates_inplace
 
-
-    source_file = Path(__file__).parent / (
-        "data/structural.with-blank.xlsx" if good else "data/structural.bad-blank.xlsx"
-    )
-    output_path = tmp_path / "target.xlsx"
-    linking_table_old = tmp_path / "linking_table_old.csv"
-    linking_table_out = tmp_path / "linking_table_out.csv"
+source_file = "data/structural.with-blank.xlsx"
+output_path = tmp_path / "target.xlsx"
+linking_table_old = tmp_path / "linking_table_old.csv"
+linking_table_out = tmp_path / "linking_table_out.csv"
 
 # Configure which sheets and columns to shift
 sheet_configs = {
@@ -59,10 +56,8 @@ shift_excel_dates_inplace(
     input_file="input.xlsx",
     output_file="output.xlsx",
 
-    # columns used to compute a list of patients
+    # all patients are declared in this/named sheet
     patient_sheet="paige",
-    patient_id_col="ptid",
-
 
     sheet_configs=sheet_configs,
     min_shift_days=-15,  # Lower range
@@ -83,22 +78,20 @@ To use the same shifts across multiple runs, save and reuse a linking table:
 
 ```python
 # First run: generate and save shifts
-shift_excel_dates(
+shift_excel_dates_inplace(
     input_file="input.xlsx",
     output_file="output.xlsx",
     patient_sheet="patients",
-    patient_id_col="patient_id",
     sheet_configs=sheet_configs,
     linking_table_output="shift_mappings.csv",  # Save shifts
     seed=42,
 )
 
 # Subsequent runs: reuse the same shifts
-shift_excel_dates(
+shift_excel_dates_inplace(
     input_file="new_input.xlsx",
     output_file="new_output.xlsx",
     patient_sheet="patients",
-    patient_id_col="patient_id",
     sheet_configs=sheet_configs,
     linking_table_path="shift_mappings.csv",  # Reuse saved shifts
 )
@@ -107,8 +100,6 @@ shift_excel_dates(
 ### Preserving formatting with `shift_excel_dates_inplace`
 
 If your workbook has rich formatting (cell styles, column widths, conditional formatting, etc.) use `shift_excel_dates_inplace` instead. It copies the input file and modifies date cells directly via openpyxl, so all formatting is preserved exactly.
-
-> `shift_excel_dates_inplace()` gets the `patient_id_col` and other `patient_sheet` values from the `sheet_config` rather than duplicate the configuration in the function call
 
 ```python
 from nuh_helper import shift_excel_dates_inplace
@@ -133,7 +124,6 @@ shift_excel_dates_inplace(
     input_file="input_final.xlsx",
     output_file="output_second.xlsx",
     patient_sheet="paige",
-    patient_id_col="ptid",
     sheet_configs=sheet_configs,
     min_shift_days=-15,  # Lower range
     max_shift_days=15,   # Upper range
@@ -155,11 +145,13 @@ The function accepts the same parameters as `shift_excel_dates` except;
 
 ### Allowing Non Dates (in `date_columns`) and Faux Dates (data that looks like dates in text columns)
 
+This is meant to be analogous to git-ignore for cell values.
+
 Studies frequently include data that's not parsable as a date in the date columns.
 This seems to change for each study, it has been text like "`_ missing _ _`" with spaces or incomplete values like `2007-09-UN` to signify that information is only partially available.
 Studies may also include things like `120/80 mmHg` which can look like dates to the safety checks.
 
-To accommodate this, teh technician can specify a **shift_ignore** file when invoking `shift_excel_dates_inplace()`
+To accommodate this, the technician can specify a **shift_ignore** file when invoking `shift_excel_dates_inplace()`.
 
 ```python
 from nuh_helper import shift_excel_dates_inplace
@@ -177,6 +169,7 @@ shift_excel_dates_inplace(
 )
 ```
 
+Since this file will (likely) accumulate patient data, just like the offset `.csv` files, it should not be committed to source control.
 This is a simple `.yaml` file with `page_name: column_name: [ignore_entry, "ignored entry2"]` format like this ...
 
 ```yaml
@@ -211,14 +204,10 @@ While this does require repeated manual intervention ...
 - `input_file`: Path to input Excel file
 - `output_file`: Path to output Excel file with shifted dates
 - `patient_sheet`: Name of the sheet containing patient IDs
-- `patient_id_col`: Name of the column containing patient IDs (not used with `shift_excel_dates_inplace()`)
-- `patient_header_row`: (Optional) Zero-based header row for the patient sheet (default: 0). If the patient sheet is in `sheet_configs`, that sheet’s `header_row` is used instead. (not used with `shift_excel_dates_inplace()`)
-- `patient_skip_rows`: (Optional) Zero-based row indices to exclude from patient data (e.g. a data-type row). If the patient sheet is in `sheet_configs`, that sheet’s `skip_rows_after_header` is used instead. (not used with `shift_excel_dates_inplace()`)
 - `min_shift_days` / `max_shift_days`: Range of days to shift (default: -15 to 15)
 - `linking_table_path`: (Optional) Path to existing linking table CSV for reproducibility
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
-- `date_format`: (Optional, `shift_excel_dates` only) Excel date format string (e.g., ‘YYYY-MM-DD’)
 - `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
   - `patient_id_col`: Patient ID column name in that sheet
   - `date_columns`: List of date column names to shift
@@ -244,7 +233,7 @@ Sheets can have a non-standard layout: e.g. a merged title row, then a descripti
 - Optional skip of rows after the header (e.g. data-type row) via `skip_rows_after_header`
 - Supports flexible date parsing (handles various formats and placeholders like "Unknown")
 - Reproducible shifts via linking tables
-- `shift_excel_dates_inplace`: can date-shift `.csv` files by streaming the rows rather than loading the whole file.
+- can date-shift `.csv` files by streaming the rows rather than loading the whole file.
 
 ### Date Shifting `.csv` Files
 
@@ -254,14 +243,14 @@ In most cases, the process for using `shift_excel_dates_inplace()` with `.csv` o
   1. a `str` that's changed to a `Path`
   2. a `Path` (or a `str`) that's checked for `.tsv` and `.csv` files
   3. a `list[Path]` of `.csv` and `.tsv` files that are treated as workbook pages
-  - each must have a different stem; `foo.tsv` and `foo.csv` will cause an error
+  - each must have a different stem; `foo.tsv` and `foo.csv` will cause an error, regardless of how the list is built
 - `output_file =` is a folder where all of the final `.csv` pages will be placed
   - if the folder/parents are missing;l they will be created
   - it **must not** have any of the input files
   - the original `.csv` or `.tsv` format/extension will be used for the output pages
 
 There is technically no requirement that all of the `.csv` files be in the same folder.
-If you're date-shifting carrot-transform output, you will want to use the list of files and remove the `person_ids.tsv` and `summary_mapstream.tsv` files.
+If you're date-shifting carrot-transform output, you will want to remove the `person_ids.tsv` and `summary_mapstream.tsv` files from the list of inputs.
 
 ### Bypassing Data Normalization and Hidden Date Checks
 
