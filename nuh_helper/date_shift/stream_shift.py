@@ -1,5 +1,5 @@
+import datetime as dt
 import logging
-from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -40,8 +40,9 @@ def shift_excel_dates_inplace(
     linking_table_output: str | None = None,
     seed: int | None = None,
     shift_ignore_yaml: None | str | Path = None,
-    sanity_date_latest: datetime | str | pd.Timestamp | None = None,
-    sanity_date_earliest: datetime | str | pd.Timestamp | None = None,
+    sanity_date_latest: dt.datetime | str | pd.Timestamp | None = None,
+    sanity_date_earliest: dt.datetime | str | pd.Timestamp | None = None,
+    clamp_date: dt.datetime | str | dt.date | pd.Timestamp | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -51,7 +52,8 @@ def shift_excel_dates_inplace(
     merged cells, column widths, conditional formatting, etc.) is preserved.
 
     Args:
-        input_file: Path to input Excel file, or, folder of .csv files, or list of .csv files
+        input_file: Path to input Excel file, or, folder of .csv files, or list of .csv
+            files to treat as an Excel workbook
         output_file: Path for the output file (copy of input with shifted dates).
         patient_sheet: Name of the sheet containing patient IDs.
         sheet_configs:
@@ -69,16 +71,23 @@ def shift_excel_dates_inplace(
             header)
         min_shift_days: Minimum number of days to shift (default: -15).
         max_shift_days: Maximum number of days to shift (default: 15).
-        linking_table_path: Optional path to existing linking table CSV for reproducibility.
-        linking_table_output: Path to save the linking table CSV (default: 'shift_mappings.csv').
+        linking_table_path: Optional path to existing linking table CSV for
+            reproducibility.
+        linking_table_output: Path to save the linking table CSV
+            (default: 'shift_mappings.csv').
         seed: Optional random seed for generating shifts.
         shift_ignore_yaml:
             path to a .yaml file holding `page:{column:[values]}` lists of cell
             values that're ignored and passed as-is with no manipulation. None
             and "" are always added, and all values will be .strip()
             (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
-        sanity_date_latest, sanity_date_earliest: latest and earliest dates allowed in the data. used as a sanity check
-    """  # noqa: E501
+        sanity_date_latest, sanity_date_earliest: latest and earliest dates allowed in
+            the data. used as a sanity check
+        clamp_date:
+            optional "maximum date value" for shifted date columns. ignored dates
+            and dates in un shifted columns aren't changed. this is performed after
+            shifting the dates.
+    """
 
     logger.info(
         f"Shifting dates in-place: '{input_file=}' -> '{output_file=}'"
@@ -86,15 +95,19 @@ def shift_excel_dates_inplace(
     )
 
     if sanity_date_latest is None:
-        sanity_date_latest = datetime.now()
+        sanity_date_latest = dt.datetime.now()
     if not isinstance(sanity_date_latest, pd.Timestamp):
         sanity_date_latest = pd.Timestamp(sanity_date_latest)
 
     if sanity_date_earliest is None:
         sanity_date_earliest = "1900-01-01"
-
     if not isinstance(sanity_date_earliest, pd.Timestamp):
         sanity_date_earliest = pd.Timestamp(sanity_date_earliest)
+
+    if not clamp_date:
+        clamp_date = None
+    elif not isinstance(clamp_date, pd.Timestamp):
+        clamp_date = pd.Timestamp(clamp_date)
 
     book: BaseWorkBook = book_open(input_file)
     logger.info(f"Book has {type(book)=}")
@@ -149,6 +162,7 @@ def shift_excel_dates_inplace(
                 shift_ignore=shift_ignore,
                 sanity_date_earliest=sanity_date_earliest,
                 sanity_date_latest=sanity_date_latest,
+                clamp_date=clamp_date,
             )
 
             if str(shifted_cell) != str(cell_value):
@@ -165,6 +179,7 @@ def _shift_cell(
     shift_ignore: shift_ignore_t,
     sanity_date_earliest: pd.Timestamp,
     sanity_date_latest: pd.Timestamp,
+    clamp_date: dt.datetime,
 ) -> str:
     # skip the patient id column (it was already checked anyway)
     if col_idx == detail.patient_id_idx:
@@ -206,7 +221,7 @@ def _shift_cell(
                         found,
                     )
         case ColumnType.DATE:
-            # cell_value can be str | datetime | date
+            # cell_value can be str | dt.datetime | date
             # ... so parsed might not always succeed
             parsed: None | pd.Timestamp = _parse._parse_date_value(cell_value)
             if parsed is None:
@@ -225,8 +240,12 @@ def _shift_cell(
             # perform the actual shifting
             shifted = parsed + shift_delta
 
+            # clamp the shifted value
+            if clamp_date and clamp_date < shifted:
+                shifted = clamp_date
+
             # TODO; allow column/sheet/workbook format settings
-            if isinstance(cell_value, datetime):
+            if isinstance(cell_value, dt.datetime):
                 return cast(Any, shifted.to_pydatetime())
             else:
                 return cast(Any, shifted.to_pydatetime().date())
