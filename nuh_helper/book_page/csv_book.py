@@ -1,4 +1,3 @@
-import contextlib
 import csv
 from _collections_abc import dict_keys
 from collections.abc import Generator as gen
@@ -16,8 +15,7 @@ class CSVWorkBook(BaseWorkBook):
     def keys(self) -> dict_keys:
         return self._page_files.keys()
 
-    @contextlib.contextmanager
-    def __getitem__(self, name: str) -> gen[BasePage]:
+    def __getitem__(self, name: str) -> BasePage:
 
         class CSVPage(BasePage):
             def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
@@ -32,6 +30,7 @@ class CSVWorkBook(BaseWorkBook):
                         # strip bom
                         if (
                             row == 0
+                            and line
                             and isinstance(line[0], str)
                             and line[0][:1] == "\ufeff"
                         ):
@@ -40,7 +39,7 @@ class CSVWorkBook(BaseWorkBook):
                         yield (row, line)
 
         assert isinstance(self._page_files[name], Path)
-        yield CSVPage(name, self._page_files[name])
+        return CSVPage(name, self._page_files[name])
 
     def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
 

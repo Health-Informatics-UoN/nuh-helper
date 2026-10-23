@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Generator as gen
-from collections.abc import Iterable as iterator
+from collections.abc import Iterable as iterable
 from datetime import date, datetime
 from functools import cached_property
 from pathlib import Path
@@ -17,7 +17,7 @@ class BasePage(ABC):
     @abstractmethod
     def _stream_rows_impl(self) -> gen[tuple[int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        raise NotImplementedError()
+        ...
 
     def stream_rows(self) -> gen[tuple[int, row_val_t]]:
         """public method for reading a RO stream of rows from a specific page"""
@@ -41,17 +41,15 @@ class BaseWorkBook(ABC):
         return name in self.keys()
 
     @abstractmethod
-    def __getitem__(self, name: str) -> gen[BasePage]:
-        raise NotImplementedError()
+    def __getitem__(self, name: str) -> BasePage: ...
 
     @abstractmethod
-    def keys(self) -> iterator[str]:
-        raise NotImplementedError()
+    def keys(self) -> iterable[str]: ...
 
     @abstractmethod
     def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
         """performs the workbook specific yield/write of the row data"""
-        raise NotImplementedError()
+        ...
 
     def stream_copy(
         self,
@@ -71,6 +69,9 @@ class BaseWorkBook(ABC):
         date_format = date_format if date_format else "%Y-%m-%d"
 
         for page_name, row_idx, row_data in self._stream_copy_impl(into):
+            if BaseWorkBook.normalize_values:
+                for raw_idx, raw_val in enumerate(row_data):
+                    row_data[raw_idx] = normalize_val(raw_val)
             yield page_name, row_idx, row_data
             if BaseWorkBook.normalize_values:
                 for raw_idx, raw_val in enumerate(row_data):
@@ -81,11 +82,10 @@ class BaseWorkBook(ABC):
 
     def __iter__(self) -> gen[BasePage]:
         for name in self.keys():
-            with self[name] as page:
-                yield page
+            yield self[name]
 
 
-def normalize_val(src: object) -> object:
+def normalize_val(src: object) -> cell_val_t:
     """parse to a datetime, .strip(), turn "" into None, retain bool"""
 
     if (
@@ -131,7 +131,7 @@ def normalize_val(src: object) -> object:
     return src
 
 
-def normalize_row(row: list[str]) -> list[str]:
+def normalize_row(row: iterable[str]) -> row_val_t:
     """modifies (and returns) the passed array to drop extra whitespace and replace
     fully blank entries with None. doesn't touch non-strings"""
 

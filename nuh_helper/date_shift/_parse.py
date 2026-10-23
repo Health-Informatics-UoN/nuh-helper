@@ -18,14 +18,12 @@ def _parse_date_value(
         return result if pd.notna(result) else None
 
     if isinstance(value, str):
-        v = value.strip()
-        if not v or v.lower() in {"unknown", "unk", "unkown", "n/a", "none", "null"}:
-            return None
+        value = value.strip()
 
         # Try a handful of common formats, including YYYY-DD-MM found in some feeds
         for fmt in ("%Y-%m-%d", "%Y-%d-%m", "%d-%m-%Y", "%m-%d-%Y"):
             try:
-                parsed = pd.to_datetime(v, format=fmt, errors="coerce")
+                parsed = pd.to_datetime(value, format=fmt, errors="coerce")
                 if pd.notna(parsed):
                     return parsed
             except (TypeError, ValueError):
@@ -33,7 +31,7 @@ def _parse_date_value(
                 pass
 
         # Fallback: let pandas try with dayfirst to handle ambiguous strings
-        parsed = pd.to_datetime(v, errors="coerce", dayfirst=True)
+        parsed = pd.to_datetime(value, errors="coerce", dayfirst=True)
         return parsed if pd.notna(parsed) else None
 
     # Anything else: no parse
@@ -45,9 +43,10 @@ def _normalize_patient_id(value: object) -> str | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
 
-    if isinstance(value, str):
-        v = value.strip()
-        return v if v else None
+    if value and not isinstance(value, str):
+        value = str(value)
 
-    v = str(value).strip()
-    return v if v else None
+    if value:
+        value = value.strip()
+
+    return value if value else None

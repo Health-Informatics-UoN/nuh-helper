@@ -19,63 +19,63 @@ Helper library for enabling data studies: utilities for study enablement such as
 ### Date shifting (basic example)
 
 ```python
-from nuh_helper import shift_excel_dates
-# or: from nuh_helper.date_shift import shift_excel_dates
+from nuh_helper import shift_excel_dates_inplace
+
+
+    source_file = Path(__file__).parent / (
+        "data/structural.with-blank.xlsx" if good else "data/structural.bad-blank.xlsx"
+    )
+    output_path = tmp_path / "target.xlsx"
+    linking_table_old = tmp_path / "linking_table_old.csv"
+    linking_table_out = tmp_path / "linking_table_out.csv"
 
 # Configure which sheets and columns to shift
 sheet_configs = {
-    "patients": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["dob", "date_of_diagnosis"],
-        "header_row": 1,  # Optional: zero-based row index for column names
+
+    # shift the dates in the "paige" sheet
+    "paige": {
+        # patient IDs are in the "ptid" column
+        "patient_id_col": "ptid",
+        "date_columns": [
+            # shift the dates in the DOB column
+            "dob",
+        ],
+        "text_columns": [
+            # the food column has no dates
+            "food",
+        ],
+        "header_row": 0, # Optional: zero-based row index for column names. defaults to 0
+        "skip_rows_after_header": [],
     },
-    "labs": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["test_date"],
-        "header_row": 1,
-    },
+
+    # ignore the "stuff" page
+    "stuff": "skip",
 }
 
+
 # Shift dates in the Excel file
-shift_excel_dates(
+shift_excel_dates_inplace(
+    # input / output files
     input_file="input.xlsx",
     output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
+
+    # columns used to compute a list of patients
+    patient_sheet="paige",
+    patient_id_col="ptid",
+
+
     sheet_configs=sheet_configs,
     min_shift_days=-15,  # Lower range
     max_shift_days=15,   # Upper range
     seed=42,             # For reproducibility
-    date_format="YYYY-MM-DD",
+
+    # optional - csv files saving how many days each patient was shifted
+    # ... do not distribute these
+    # ... and probably best to keep them somewhere
+    linking_table_path="linking_table_old.csv",
+    linking_table_output="linking_table_new.csv",
 )
 ```
-
-### Excluding fixed study dates with `shift_exceptions`
-
-Some columns contain a mix of patient-specific dates (which should be shifted) and fixed study-wide dates (e.g. an end-of-study date) that must remain unchanged. Use `shift_exceptions` in `sheet_configs` to list any date values that should never be shifted:
-
-```python
-sheet_configs = {
-    "patients": {
-        "patient_id_col": "patient_id",
-        "date_columns": ["last_alive"],
-        "shift_exceptions": {
-            "last_alive": ["2024-12-31"],  # end-of-study date — never shift
-        },
-    },
-}
-
-shift_excel_dates(
-    input_file="input.xlsx",
-    output_file="output.xlsx",
-    patient_sheet="patients",
-    patient_id_col="patient_id",
-    sheet_configs=sheet_configs,
-    seed=42,
-)
-```
-
-The exception date strings are parsed with the same flexible parser used for all date values (supports multiple formats and placeholder strings). Exceptions are matched against the parsed date, so `"2024-12-31"` and `"31-12-2024"` both match the same calendar date.
 
 ### Reproducible Shifts with Linking Table
 
@@ -118,8 +118,30 @@ shift_excel_dates_inplace(
     output_file="output.xlsx",
     patient_sheet="patients",
     sheet_configs=sheet_configs,
-    seed=42,
-    linking_table_output="shift_mappings.csv",
+    min_shift_days=-15,  # Lower range
+    max_shift_days=15,   # Upper range
+    seed=42,             # For reproducibility
+
+    # optional - csv files saving how many days each patient was shifted
+    # ... do not distribute these
+    # ... and probably best to keep them somewhere specific
+    linking_table_output="linking_table_first.csv",
+)
+
+# Second run: reuse the same shifts
+shift_excel_dates_inplace(
+    input_file="input_final.xlsx",
+    output_file="output_second.xlsx",
+    patient_sheet="paige",
+    patient_id_col="ptid",
+    sheet_configs=sheet_configs,
+    min_shift_days=-15,  # Lower range
+    max_shift_days=15,   # Upper range
+    seed=42,             # For reproducibility
+
+    # write to a new file this time
+    linking_table_path="linking_table_first.csv",
+    linking_table_output="linking_table_second.csv",
 )
 ```
 
