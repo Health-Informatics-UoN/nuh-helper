@@ -69,6 +69,19 @@ class UnknownPatient(Exception):
         self._message = message
 
 
+class MissingPatient(ValueError):
+    """raised when a row has data but no patient id"""
+
+    def __init__(self, page: str, row: int) -> None:
+        message = f"{page=} has date with no patient on {row=}"
+
+        super().__init__(message)
+
+        self._message = message
+        self._page = page
+        self._row = row
+
+
 class ShiftFoundNonDate(Exception):
     def __init__(
         self, page: str, row: int, col: int, col_name: str, value: str
