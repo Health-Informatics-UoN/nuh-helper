@@ -199,6 +199,14 @@ While this does require repeated manual intervention ...
 - It keeps any potential patient data out of the configuration file
   - ... as the ignore list will presumably be deleted or stored with the linking_table.csv files
 
+### "Clamping" the Study End Date
+
+A further feature of `shift_excel_dates_inplace()` allows supplying a "clamp date" to control shifted date values.
+At least one previous study collected data which included dates after the study end date.
+The procedure for this study tasked the data technician to change all dates back to the study end date.
+Setting `clamp_date=???` when invoking `shift_excel_dates_inplace()` will clamp all shifted dates in the same manner removing the need for human effort.
+The approach will not change any dates which are not being shifted - even if they extend past this value - with the assumption being that non-shifted dates are not study data.
+
 ### Key parameters (date shifting)
 
 - `input_file`: Path to input Excel file
@@ -208,6 +216,7 @@ While this does require repeated manual intervention ...
 - `linking_table_path`: (Optional) Path to existing linking table CSV for reproducibility
 - `linking_table_output`: (Optional) Path to save the linking table CSV
 - `seed`: (Optional) Random seed for generating shifts
+- `clamp_date`: (Optional) If provided, all shifted dates will be clamped to this value as the latest, after they've been shifted. During previous studies there had been a requirement that any dates be updated so that none were after the study end date. Doing this during date shifting alleviates the need to search the final `.xslx` sheet for dates. Un-shifted dates, presumably things like CDM version history, are not changed.
 - `sheet_configs`: Dictionary mapping sheet names to configuration dicts, or, the string 'skip' if that sheet should be skipped but is a valid part of the CDM.
   - `patient_id_col`: Patient ID column name in that sheet
   - `date_columns`: List of date column names to shift
