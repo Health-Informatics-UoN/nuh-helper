@@ -21,10 +21,10 @@ Helper library for enabling data studies: utilities for study enablement such as
 ```python
 from nuh_helper import shift_excel_dates_inplace
 
-source_file = "data/structural.with-blank.xlsx"
-output_path = tmp_path / "target.xlsx"
-linking_table_old = tmp_path / "linking_table_old.csv"
-linking_table_out = tmp_path / "linking_table_out.csv"
+source_file = "source/cdm-with-patient-data.xlsx"
+output_path = "output/target.xlsx"
+linking_table_old = "saved/linking_table.old.last-ti-me.csv"
+linking_table_out = "saved/linking_table.out.this-ti-me.csv"
 
 # Configure which sheets and columns to shift
 sheet_configs = {
