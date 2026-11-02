@@ -18,6 +18,7 @@ from nuh_helper.date_shift.defs import (
     ShiftFoundNonDate,
     UnknownPatient,
     sheet_configs_t,
+    shift_datetime_t,
 )
 from nuh_helper.date_shift.ignore import shift_ignore_load, shift_ignore_t
 from nuh_helper.date_shift.row_machine import (
@@ -40,9 +41,9 @@ def shift_excel_dates_inplace(
     linking_table_output: str | None = None,
     seed: int | None = None,
     shift_ignore_yaml: None | str | Path = None,
-    sanity_date_latest: dt.datetime | str | pd.Timestamp | None = None,
-    sanity_date_earliest: dt.datetime | str | pd.Timestamp | None = None,
-    clamp_date: dt.datetime | str | dt.date | pd.Timestamp | None = None,
+    sanity_date_latest: shift_datetime_t | None = None,
+    sanity_date_earliest: shift_datetime_t | None = None,
+    clamp_date: shift_datetime_t | None = None,
 ) -> None:
     """
     Shift dates in an Excel file, preserving all cell formatting.
@@ -179,7 +180,7 @@ def _shift_cell(
     shift_ignore: shift_ignore_t,
     sanity_date_earliest: pd.Timestamp,
     sanity_date_latest: pd.Timestamp,
-    clamp_date: dt.datetime,
+    clamp_date: pd.Timestamp | None,
 ) -> str:
     # skip the patient id column (it was already checked anyway)
     if col_idx == detail.patient_id_idx:
@@ -241,7 +242,7 @@ def _shift_cell(
             shifted = parsed + shift_delta
 
             # clamp the shifted value
-            if clamp_date and clamp_date < shifted:
+            if (clamp_date is not None) and clamp_date < shifted:
                 shifted = clamp_date
 
             # TODO; allow column/sheet/workbook format settings
