@@ -72,8 +72,7 @@ def shift_excel_dates_inplace(
             path to a .yaml file holding `page:{column:[values]}` lists of cell
             values that're ignored and passed as-is with no manipulation. None
             and "" are always added, and all values will be .strip()
-
-        (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
+            (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
     """  # noqa: E501
 
     logger.info(
