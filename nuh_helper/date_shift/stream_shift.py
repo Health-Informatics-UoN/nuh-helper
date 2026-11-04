@@ -41,8 +41,8 @@ def shift_excel_dates_inplace(
     linking_table_output: str | None = None,
     seed: int | None = None,
     shift_ignore_yaml: None | str | Path = None,
-    sanity_date_latest: shift_datetime_t | None = None,
-    sanity_date_earliest: shift_datetime_t | None = None,
+    latest_allowed_date: shift_datetime_t | None = None,
+    earliest_allowed_date: shift_datetime_t | None = None,
     clamp_date: shift_datetime_t | None = None,
 ) -> None:
     """
@@ -82,7 +82,7 @@ def shift_excel_dates_inplace(
             values that're ignored and passed as-is with no manipulation. None
             and "" are always added, and all values will be .strip()
             (Defaults to linking_table_path.parent / shift_ignore.do-not-commit.yaml)
-        sanity_date_latest, sanity_date_earliest: latest and earliest dates allowed in
+        latest_allowed_date, earliest_allowed_date: latest and earliest dates allowed in
             the data. used as a sanity check
         clamp_date:
             optional "maximum date value" for shifted date columns. ignored dates
@@ -95,15 +95,16 @@ def shift_excel_dates_inplace(
         + f"{min_shift_days=} {max_shift_days=} {seed=}"
     )
 
-    if sanity_date_latest is None:
-        sanity_date_latest = dt.datetime.now()
-    if not isinstance(sanity_date_latest, pd.Timestamp):
-        sanity_date_latest = pd.Timestamp(sanity_date_latest)
+    if latest_allowed_date is None:
+        latest_allowed_date = dt.datetime.now()
+    if not isinstance(latest_allowed_date, pd.Timestamp):
+        latest_allowed_date = pd.Timestamp(latest_allowed_date)
 
-    if sanity_date_earliest is None:
-        sanity_date_earliest = "1900-01-01"
-    if not isinstance(sanity_date_earliest, pd.Timestamp):
-        sanity_date_earliest = pd.Timestamp(sanity_date_earliest)
+    if earliest_allowed_date is None:
+        earliest_allowed_date = "1900-01-01"
+
+    if not isinstance(earliest_allowed_date, pd.Timestamp):
+        earliest_allowed_date = pd.Timestamp(earliest_allowed_date)
 
     if not clamp_date:
         clamp_date = None
@@ -161,8 +162,8 @@ def shift_excel_dates_inplace(
                 detail=detail,
                 shift_delta=shift_delta,
                 shift_ignore=shift_ignore,
-                sanity_date_earliest=sanity_date_earliest,
-                sanity_date_latest=sanity_date_latest,
+                earliest_allowed_date=earliest_allowed_date,
+                latest_allowed_date=latest_allowed_date,
                 clamp_date=clamp_date,
             )
 
@@ -178,8 +179,8 @@ def _shift_cell(
     detail: PatientRow,
     shift_delta: pd.Timedelta,
     shift_ignore: shift_ignore_t,
-    sanity_date_earliest: pd.Timestamp,
-    sanity_date_latest: pd.Timestamp,
+    earliest_allowed_date: pd.Timestamp,
+    latest_allowed_date: pd.Timestamp,
     clamp_date: pd.Timestamp | None,
 ) -> str:
     # skip the patient id column (it was already checked anyway)
@@ -233,9 +234,9 @@ def _shift_cell(
 
             # only check the dates we're shifting
             # ... other branches handle non-dates and dates we're not shifting
-            if parsed <= sanity_date_earliest:
+            if parsed < earliest_allowed_date:
                 raise DateTooFarBack(parsed)
-            if parsed >= sanity_date_latest:
+            if parsed > latest_allowed_date:
                 raise DateTooFarAhead(parsed)
 
             # perform the actual shifting
