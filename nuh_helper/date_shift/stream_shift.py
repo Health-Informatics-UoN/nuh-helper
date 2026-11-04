@@ -217,9 +217,9 @@ def _shift_cell(
 
             # only check the dates we're shifting
             # ... other branches handle non-dates and dates we're not shifting
-            if parsed <= earliest_allowed_date:
+            if parsed < earliest_allowed_date:
                 raise DateTooFarBack(parsed)
-            if parsed >= latest_allowed_date:
+            if parsed > latest_allowed_date:
                 raise DateTooFarAhead(parsed)
 
             # perform the actual shifting
