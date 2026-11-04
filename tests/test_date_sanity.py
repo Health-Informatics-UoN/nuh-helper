@@ -116,7 +116,7 @@ def test_too_far_back(tmp_path: Path) -> None:
             seed=14333,
             linking_table_path=str(linking_table_old),
             linking_table_output=str(linking_table_out),
-            sanity_date_earliest="1950-01-01",
+            earliest_allowed_date="1950-01-01",
         )
 
     assert info.value._message == "the date 1900-05-25 00:00:00 is too far in the past"
