@@ -3,7 +3,7 @@ collects the exceptions and sheet_configs_t. these are used across the package a
 to be in one "root" file.
 """
 
-from datetime import datetime
+import datetime as dt
 from typing import Literal
 
 import pandas as pd
@@ -16,6 +16,9 @@ _sheet_config_single_t = dict[str, _sheet_config_row_t] | Literal["skip"]
 
 # the whole configuration for a shift workbook will have this type
 sheet_configs_t = dict[str, _sheet_config_single_t]
+
+# datetime limits come into shift like this
+shift_datetime_t = dt.datetime | str | dt.date | pd.Timestamp
 
 
 class PatientColumnMissing(Exception):
@@ -126,7 +129,7 @@ class HiddenDate(ValueError):
         col: int,
         col_name: str,
         value: str,
-        found: datetime,
+        found: object,
     ) -> None:
         message = (
             f"hidden date in [{sheet_name=}, {row}, {col} @ {col_name}] {value=} "
