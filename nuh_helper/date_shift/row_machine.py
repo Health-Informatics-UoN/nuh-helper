@@ -20,6 +20,7 @@ from nuh_helper.date_shift.defs import (
     DateColumnsMissing,
     ExtraColumns,
     HiddenDate,
+    MissingPatient,
     PatientColumnMissing,
     TextColumnsMissing,
     sheet_configs_t,
@@ -61,7 +62,7 @@ class PatientRow:
             self.page_name, {}
         ).get(col_name, {None, "", "NULL", "None"})
 
-        # we need these as well
+        # expand to include the dates when datetime=00:00:00 and datetime for dates
         ignored = (
             list(ignored)
             + [
@@ -253,15 +254,13 @@ class PatientRowStateMachine:
         patient_id = _parse._normalize_patient_id(patient_id)
         if patient_id is None or patient_id == "NULL":
             # if the pid is None; the rest of the row should be None as well
-            if non_blank := [
+            if [
                 cell
                 for cell in row_cells
                 # keep the cells that aren't blank
                 if cell is not None and str(cell).strip() != ""
             ]:
-                raise ValueError(
-                    f"{row_idx=} has no pid, should be blank but has {non_blank}"
-                )
+                raise MissingPatient(sheet_name, row_idx)
 
             # we've completed the checks for a None pid
             # ... so we need to skip the rest of this loop

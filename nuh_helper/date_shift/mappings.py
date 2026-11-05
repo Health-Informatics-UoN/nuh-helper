@@ -59,16 +59,16 @@ def load_shift_deltas(
     elif not isinstance(out_linking_table, Path):
         out_linking_table = Path(out_linking_table)
 
-    with book[patient_sheet] as page:
-        scanner = PatientRowStateMachine(sheet_configs)
-        patient_ids: list[str] = [
-            pid.patient_id
-            for pid in [
-                scanner.next_details(page.name, row, data)
-                for row, data in page.stream_rows()
-            ]
-            if pid
+    page = book[patient_sheet]
+    scanner = PatientRowStateMachine(sheet_configs)
+    patient_ids: list[str] = [
+        pid.patient_id
+        for pid in [
+            scanner.next_details(page.name, row, data)
+            for row, data in page.stream_rows()
         ]
+        if pid
+    ]
 
     # load the old ids (should we remove IDs that are "gone"?)
     if not old_linking_table or not old_linking_table.is_file():

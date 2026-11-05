@@ -6,6 +6,8 @@ to be in one "root" file.
 from datetime import datetime
 from typing import Literal
 
+import pandas as pd
+
 # each entry in a sheet config will match this
 _sheet_config_row_t = str | int | list[str] | dict[str, set[str] | list[str]]
 
@@ -69,6 +71,19 @@ class UnknownPatient(Exception):
         self._message = message
 
 
+class MissingPatient(ValueError):
+    """raised when a row has data but no patient id"""
+
+    def __init__(self, page: str, row: int) -> None:
+        message = f"{page=} has date with no patient on {row=}"
+
+        super().__init__(message)
+
+        self._message = message
+        self._page = page
+        self._row = row
+
+
 class ShiftFoundNonDate(Exception):
     def __init__(
         self, page: str, row: int, col: int, col_name: str, value: str
@@ -83,6 +98,22 @@ class ShiftFoundNonDate(Exception):
         self._col: int = col
         self._col_name: str = col_name
         self._value: str = value
+
+
+class DateTooFarBack(Exception):
+    def __init__(self, date: pd.Timestamp) -> None:
+        message = f"the date {date} is too far in the past"
+        super().__init__(message)
+        self._message = message
+        self._date = date
+
+
+class DateTooFarAhead(Exception):
+    def __init__(self, date: pd.Timestamp) -> None:
+        message = f"the date {date} is too far in the future"
+        super().__init__(message)
+        self._message = message
+        self._date = date
 
 
 class HiddenDate(ValueError):

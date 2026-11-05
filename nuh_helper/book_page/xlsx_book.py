@@ -1,4 +1,3 @@
-import contextlib
 import shutil
 from collections.abc import Generator as gen
 from pathlib import Path
@@ -21,9 +20,7 @@ class XLSXWorkBook(BaseWorkBook):
     def keys(self) -> list[str]:
         return [page.title for page in self._book.worksheets]
 
-    def _stream_copy_impl(self, into: str | Path) -> gen[tuple[str, int, row_val_t]]:
-        if not isinstance(into, Path):
-            into = Path(into)
+    def _stream_copy_impl(self, into: Path) -> gen[tuple[str, int, row_val_t]]:
 
         if not into.name.endswith(".xlsx"):
             into = into / self._file.name
@@ -42,7 +39,6 @@ class XLSXWorkBook(BaseWorkBook):
                         page.cell(r + 1, c + 1).value = val
         the_copy.save(into)
 
-    @contextlib.contextmanager
     def __getitem__(self, name: str) -> gen[BasePage]:
 
         if len(name) > 31:
@@ -59,4 +55,4 @@ class XLSXWorkBook(BaseWorkBook):
                         ],
                     )
 
-        yield XLSXPage(name, self._book[name])
+        return XLSXPage(name, self._book[name])
