@@ -3,13 +3,13 @@ from pathlib import Path
 from typing import Literal, Never
 
 import pytest
+from conftest import load_workbook
 
 from nuh_helper.book_page import (
     BaseWorkBook,
     CSVWorkBook,
     XLSXWorkBook,
     book_open,
-    load_workbook,
     normalize_row,
 )
 
@@ -286,6 +286,8 @@ def test_bom_is_removed() -> None:
 
 
 def test_full_datetime(tmp_path: Path) -> None:
+    """test showing that the times are lost when working with CSVs"""
+
     source = tmp_path / "source/data.csv"
     output = tmp_path / "output/data.csv"
 
@@ -295,11 +297,11 @@ def test_full_datetime(tmp_path: Path) -> None:
     source.write_text(
         textwrap.dedent(
             """
-        name, time
-        foo, 2012-09-18 00:01:02
-        bar, 2012-09-11
-        """
-        )
+            name, time
+            foo, 2012-09-18 00:01:02
+            bar, 2012-09-11
+            """
+        ).strip()
     )
 
     for _ in book_open([source]).stream_copy(output):
@@ -313,4 +315,9 @@ def test_full_datetime(tmp_path: Path) -> None:
             normalize_row(["bar", "2012-09-11"]),
         ]
     }
-    assert obtained == expected
+    o = obtained["data"][1][1]
+    e = expected["data"][1][1]
+    assert o == e, (
+        f"date/times should match - but the times are being stripped\n\t{o=}\n\t{e=}"
+    )
+    assert obtained == expected, "checking the full page"
