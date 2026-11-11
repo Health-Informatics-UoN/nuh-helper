@@ -238,10 +238,9 @@ class PatientRowStateMachine:
         patient_id = row_cells[self._detail_archetype.patient_id_idx]
 
         # check for date in the patient_id
-        for found in datefinder.find_dates(str(patient_id)):
-            logger.debug("found hidden date in patient_id field %s", sheet_name)
-
-            if HiddenDate.perform_checks:
+        # ... datefinder is slow, so only look when the check is on
+        if HiddenDate.perform_checks:
+            for found in datefinder.find_dates(str(patient_id)):
                 raise HiddenDate(
                     sheet_name,
                     row_idx,

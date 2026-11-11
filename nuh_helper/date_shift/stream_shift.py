@@ -191,12 +191,9 @@ def _shift_cell(
             pass
         case ColumnType.TEXT:
             # check for dates in non-date columns
-            for found in datefinder.find_dates(str(cell_value)):
-                logger.debug(
-                    f"found hidden date {detail.page_name=}/{col_name=}"
-                    + f":{cell_value}"
-                )
-                if HiddenDate.perform_checks:
+            # ... datefinder is slow, so only look when the check is on
+            if HiddenDate.perform_checks:
+                for found in datefinder.find_dates(str(cell_value)):
                     raise HiddenDate(
                         detail.page_name,
                         detail.row_idx,
