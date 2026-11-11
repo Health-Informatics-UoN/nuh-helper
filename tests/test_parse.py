@@ -15,6 +15,10 @@ from nuh_helper.date_shift._parse import _normalize_patient_id, _parse_date_valu
         ("2016-12-03", "2016-12-03 00:00:00"),
         ("2016-13-03", "2016-03-13 00:00:00"),
         ("31-12-2004", "2004-12-31 00:00:00"),
+        # ISO datetimes are year-month-day (these used to be parsed day-first)
+        ("2026-10-01 03:12:45.000", "2026-10-01 03:12:45"),
+        ("2016-12-03T10:11:12", "2016-12-03 10:11:12"),
+        ("2026-01-05 00:00:00", "2026-01-05 00:00:00"),
         ("not-a-date", "None"),
         (3.9, "None"),
         (None, "None"),

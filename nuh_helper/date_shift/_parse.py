@@ -20,6 +20,15 @@ def _parse_date_value(
     if isinstance(value, str):
         value = value.strip()
 
+        # Fast path for ISO 8601 (YYYY-MM-DD with an optional time) which is most
+        # ... values; pd.to_datetime() is about 400 times slower per call. This also
+        # ... stops the dayfirst fallback below swapping the day and month of an ISO
+        # ... datetime like "2026-10-01 03:12:45.000"
+        try:
+            return pd.Timestamp(datetime.fromisoformat(value))
+        except ValueError:
+            pass
+
         # Try a handful of common formats, including YYYY-DD-MM found in some feeds
         for fmt in ("%Y-%m-%d", "%Y-%d-%m", "%d-%m-%Y", "%m-%d-%Y"):
             try:
