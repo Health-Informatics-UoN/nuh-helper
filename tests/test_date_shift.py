@@ -367,10 +367,10 @@ def test_shift_collision(tmp_path: Path) -> None:
     assert day1_offsets["p3"] == day2_offsets["p3"]
     assert day1_offsets["p8"] == day2_offsets["p8"]
 
-    # verify bugs
-    assert day1_offsets["p1"] == day2_offsets["p4"]
-    assert day1_offsets["p3"] == day2_offsets["p5"]
-    assert day1_offsets["p6"] == day2_offsets["p9"]
+    # verify that the new-offsets are different (they should be)
+    assert day1_offsets["p1"] != day2_offsets["p4"]
+    assert day1_offsets["p3"] != day2_offsets["p5"]
+    assert day1_offsets["p6"] != day2_offsets["p9"]
 
 
 def load_offsets(path: Path) -> dict[str, int]:
