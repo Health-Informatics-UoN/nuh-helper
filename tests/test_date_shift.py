@@ -340,8 +340,9 @@ def test_shift_collision(tmp_path: Path) -> None:
         sheet_configs=sheet_configs,
         linking_table_path=day1_source.parent / "old.csv",
         linking_table_output=day1_source.parent / "out.csv",
-        # shift_ignore_yaml=test_data / "shift-ignore.yaml",
         seed=43,
+        min_shift_days=-10000,
+        max_shift_days=+10000,
     )
     # shift day2 re-using day1 offsets
     shift_excel_dates_inplace(
@@ -351,8 +352,9 @@ def test_shift_collision(tmp_path: Path) -> None:
         sheet_configs=sheet_configs,
         linking_table_path=day1_source.parent / "out.csv",
         linking_table_output=day2_source.parent / "out.csv",
-        # shift_ignore_yaml=test_data / "shift-ignore.yaml",
         seed=43,
+        min_shift_days=-10000,
+        max_shift_days=+10000,
     )
 
     # --- assert ---
