@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
+import datefinder
 import pytest
 
 from nuh_helper import shift_excel_dates_inplace
@@ -182,3 +183,30 @@ def test_hidden_in_patient_id(tmp_path: Path) -> None:
     assert info.value._col == 0
     assert info.value._value == "nuh012 12/11/2001"
     assert info.value._found == datetime(2001, 12, 11)
+
+
+def test_bypass_skips_datefinder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """with the check off, datefinder (which is slow) shouldn't be called at all"""
+
+    def find_dates(text: str) -> None:
+        raise AssertionError(f"datefinder was called on {text=}")
+
+    monkeypatch.setattr(datefinder, "find_dates", find_dates)
+    monkeypatch.setattr(HiddenDate, "perform_checks", False)
+
+    shift_excel_dates_inplace(
+        input_file=str(Path(__file__).parent / "data/hidden_dates/us_date.xlsx"),
+        output_file=str(tmp_path / "target.xlsx"),
+        patient_sheet="data",
+        sheet_configs={
+            "data": {
+                "patient_id_col": "ptid",
+                "date_columns": ["dob"],
+                "text_columns": ["diagnosis"],
+            },
+        },
+        seed=14333,
+        linking_table_output=str(tmp_path / "linking_table_out.csv"),
+    )

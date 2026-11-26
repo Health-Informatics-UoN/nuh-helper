@@ -93,7 +93,10 @@ def load_shift_deltas(
         )
         for id in patient_ids
     }
-    removed = len([k for k in all_mappings if k not in patient_ids])
+    # old ids that aren't patients any more are left out of the new linking table
+    # ... use a set; checking each id against the list was quadratic
+    current_ids = set(patient_ids)
+    removed = len([k for k in old_mappings if k not in current_ids])
     logger.info(
         f"patient_shift_deltas() ; {len(all_mappings)=} patient(s) (... and {removed=})"
     )

@@ -252,3 +252,40 @@ class TestShiftExcelDatesExceptionsIntegration:
         obtained = load_workbook(out)
 
         assert obtained == expected
+
+
+def test_linking_table_drops_old_patients(
+    caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    """an id in the old linking table that isn't a patient any more is counted and
+    left out of the new linking table; current patients keep their shift"""
+
+    old_linking = tmp_path / "old-linking.csv"
+    old_linking.write_text("patient_id,shift_days\nP1,7\ngone,5\n")
+    linking = tmp_path / "linking.csv"
+
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "patients.csv").write_text("ptid,dob\nP1,2001-02-03\nP2,2004-05-06\n")
+
+    with caplog.at_level("INFO"):
+        shift_excel_dates_inplace(
+            input_file=source,
+            output_file=tmp_path / "out",
+            patient_sheet="patients",
+            sheet_configs={
+                "patients": {
+                    "patient_id_col": "ptid",
+                    "date_columns": ["dob"],
+                    "text_columns": [],
+                },
+            },
+            seed=14333,
+            linking_table_path=old_linking,
+            linking_table_output=linking,
+        )
+
+    assert "removed=1" in caplog.text
+    rows = linking.read_text().splitlines()
+    assert rows[:2] == ["patient_id,shift_days", "P1,7"]
+    assert [row.split(",")[0] for row in rows] == ["patient_id", "P1", "P2"]
