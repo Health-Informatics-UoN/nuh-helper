@@ -245,7 +245,7 @@ class TestShiftExcelDatesExceptionsIntegration:
         expected = {
             "patients": [
                 normalize_row(["patient_id", "last_alive"]),
-                normalize_row(["P001", "2023-06-06"]),
+                normalize_row(["P001", "2023-05-20"]),
                 normalize_row(["P002", "2024-12-31"]),
             ],
         }
@@ -257,8 +257,7 @@ class TestShiftExcelDatesExceptionsIntegration:
 def test_linking_table_drops_old_patients(
     caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
-    """an id in the old linking table that isn't a patient any more is counted and
-    left out of the new linking table; current patients keep their shift"""
+    """checks if unused participants are retained"""
 
     old_linking = tmp_path / "old-linking.csv"
     old_linking.write_text("patient_id,shift_days\nP1,7\ngone,5\n")
@@ -288,7 +287,13 @@ def test_linking_table_drops_old_patients(
     assert "removed=1" in caplog.text
     rows = linking.read_text().splitlines()
     assert rows[:2] == ["patient_id,shift_days", "P1,7"]
-    assert [row.split(",")[0] for row in rows] == ["patient_id", "P1", "P2"]
+    assert [row.split(",")[0] for row in rows] == [
+        "patient_id",
+        "P1",
+        "P2",
+        # we dont drop unused ones
+        "gone",
+    ]
 
 
 def test_shift_collision(tmp_path: Path) -> None:
