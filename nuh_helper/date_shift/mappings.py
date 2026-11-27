@@ -81,24 +81,27 @@ def load_shift_deltas(
                 if row and row[1] and row[1].strip() != "shift_days"
             }
 
-    if seed:
-        random.seed(seed)
+    random.seed((seed + len(old_mappings)) if seed else len(old_mappings))
 
     # create the list of all mappings
     all_mappings: dict[str, int] = {
         id: (
             old_mappings[id]
             if id in old_mappings
-            else random.randint(min_shift_days, max_shift_days)
+            else random.Random(
+                # seed/salt with more of the details
+                f"{seed}/{id}/{min_shift_days}/{max_shift_days}/{len(old_mappings)}"
+            ).randint(min_shift_days, max_shift_days)
         )
-        for id in patient_ids
+        for id in sorted(set(patient_ids + list(old_mappings.keys())))
     }
     # old ids that aren't patients any more are left out of the new linking table
     # ... use a set; checking each id against the list was quadratic
     current_ids = set(patient_ids)
     removed = len([k for k in old_mappings if k not in current_ids])
     logger.info(
-        f"patient_shift_deltas() ; {len(all_mappings)=} patient(s) (... and {removed=})"
+        f"patient_shift_deltas() ; {len(patient_ids)} participants "
+        + f"(... with {removed=} for a total of {len(all_mappings)})"
     )
 
     # store all mappings in the out file

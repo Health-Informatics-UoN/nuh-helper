@@ -1,6 +1,7 @@
 """Unit tests for nuh_helper.date_shift"""
 
-from datetime import date, datetime
+import csv
+import datetime as dt
 from pathlib import Path
 
 import pandas as pd
@@ -58,10 +59,10 @@ class TestParseDateValue:
         assert _parse_date_value(placeholder) is None
 
     def test_datetime_object(self) -> None:
-        assert _parse_date_value(datetime(2023, 1, 15)) == pd.Timestamp("2023-01-15")
+        assert _parse_date_value(dt.datetime(2023, 1, 15)) == pd.Timestamp("2023-01-15")
 
     def test_date_object(self) -> None:
-        assert _parse_date_value(date(2023, 1, 15)) == pd.Timestamp("2023-01-15")
+        assert _parse_date_value(dt.date(2023, 1, 15)) == pd.Timestamp("2023-01-15")
 
     def test_timestamp_object(self) -> None:
         ts = pd.Timestamp("2023-01-15")
@@ -224,7 +225,6 @@ class TestShiftExcelDatesExceptionsIntegration:
         self._make_excel(xlsx)
         out = tmp_path / "out.xlsx"
 
-        # raise Exception(f'{__name__=}')
         sheet_configs = {
             "patients": {
                 "patient_id_col": "patient_id",
@@ -245,7 +245,7 @@ class TestShiftExcelDatesExceptionsIntegration:
         expected = {
             "patients": [
                 normalize_row(["patient_id", "last_alive"]),
-                normalize_row(["P001", "2023-06-06"]),
+                normalize_row(["P001", "2023-05-20"]),
                 normalize_row(["P002", "2024-12-31"]),
             ],
         }
@@ -257,8 +257,7 @@ class TestShiftExcelDatesExceptionsIntegration:
 def test_linking_table_drops_old_patients(
     caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
-    """an id in the old linking table that isn't a patient any more is counted and
-    left out of the new linking table; current patients keep their shift"""
+    """checks if unused participants are retained"""
 
     old_linking = tmp_path / "old-linking.csv"
     old_linking.write_text("patient_id,shift_days\nP1,7\ngone,5\n")
@@ -288,4 +287,121 @@ def test_linking_table_drops_old_patients(
     assert "removed=1" in caplog.text
     rows = linking.read_text().splitlines()
     assert rows[:2] == ["patient_id,shift_days", "P1,7"]
-    assert [row.split(",")[0] for row in rows] == ["patient_id", "P1", "P2"]
+    assert [row.split(",")[0] for row in rows] == [
+        "patient_id",
+        "P1",
+        "P2",
+        # we dont drop unused ones
+        "gone",
+    ]
+
+
+def test_shift_collision(tmp_path: Path) -> None:
+
+    # --- arrange ---
+    # create day1/source.xlsx with p1, p3,         p6, p8
+    # create day2/source.xlsx with p1, p3, p4, p5,     p8, p9
+    day1_source = write_test_xlsx(
+        tmp_path / "day1/source.xlsx",
+        {
+            "data": [
+                ["ptid", "dob"],
+                ["p1", "2022-10-19"],
+                ["p3", "2021-10-19"],
+                ["p6", "2020-10-19"],
+                ["p8", "2019-10-19"],
+            ]
+        },
+    )
+    day2_source = write_test_xlsx(
+        tmp_path / "day2/source.xlsx",
+        {
+            "data": [
+                ["ptid", "dob"],
+                ["p1", "2022-10-19"],
+                ["p3", "2021-10-19"],
+                ["p4", "2018-10-19"],
+                ["p5", "2017-10-19"],
+                ["p8", "2019-10-19"],
+                ["p9", "2016-10-19"],
+            ]
+        },
+    )
+    # create the sheet config
+    sheet_configs = {
+        "data": {
+            "patient_id_col": "ptid",
+            "date_columns": ["dob"],
+            "text_columns": [],
+        }
+    }
+
+    # --- act ---
+    # shift day1
+    shift_excel_dates_inplace(
+        input_file=day1_source,
+        output_file=day1_source.parent / "shifted.xlsx",
+        patient_sheet="data",
+        sheet_configs=sheet_configs,
+        linking_table_path=day1_source.parent / "old.csv",
+        linking_table_output=day1_source.parent / "out.csv",
+        seed=43,
+        min_shift_days=-10000,
+        max_shift_days=+10000,
+    )
+    # shift day2 re-using day1 offsets
+    shift_excel_dates_inplace(
+        input_file=day2_source,
+        output_file=day2_source.parent / "shifted.xlsx",
+        patient_sheet="data",
+        sheet_configs=sheet_configs,
+        linking_table_path=day1_source.parent / "out.csv",
+        linking_table_output=day2_source.parent / "out.csv",
+        seed=43,
+        min_shift_days=-10000,
+        max_shift_days=+10000,
+    )
+
+    # --- assert ---
+
+    # verify old shifts re-used
+    day1_offsets = load_offsets(tmp_path / "day1/out.csv")
+    day2_offsets = load_offsets(tmp_path / "day2/out.csv")
+
+    assert day1_offsets["p1"] == day2_offsets["p1"]
+    assert day1_offsets["p3"] == day2_offsets["p3"]
+    assert day1_offsets["p8"] == day2_offsets["p8"]
+
+    # verify that the new-offsets are different (they should be)
+    assert day1_offsets["p1"] != day2_offsets["p4"]
+    assert day1_offsets["p3"] != day2_offsets["p5"]
+    assert day1_offsets["p6"] != day2_offsets["p9"]
+
+
+def load_offsets(path: Path) -> dict[str, int]:
+
+    with path.open() as file:
+        next(file)
+        return {row[0]: int(row[1]) for row in csv.reader(file)}
+
+
+def write_test_xlsx(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    wb: None | Workbook = None
+    for page_name in data:
+        if wb is None:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = page_name
+        else:
+            raise Exception("add page")
+        assert ws is not None
+
+        for row, cells in enumerate(data[page_name]):
+            row += 1
+            for col, val in enumerate(cells):
+                col = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[col]
+                ws[f"{col}{row}"] = val
+    wb.save(path)
+    return path
